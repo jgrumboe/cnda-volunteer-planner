@@ -35,42 +35,49 @@ export function usePlan(): UsePlanResult {
 
   // Initialize backend and load state
   useEffect(() => {
-    const backend = getBackend();
-    backendRef.current = backend;
+    let cancelled = false;
+    let unsub: (() => void) | null = null;
 
-    const rowSync = createRowSync({
-      push: (ops) => backend.push(ops),
-      onError: (errors) => {
-        const msg = errors.map((e) => e.message).join('; ');
-        setError(msg);
-      },
-    });
-    rowSyncRef.current = rowSync;
+    getBackend().then((backend) => {
+      if (cancelled) { backend.destroy(); return; }
+      backendRef.current = backend;
 
-    backend.load().then((loaded) => {
-      setStateRaw(loaded);
-      baselineRef.current = loaded;
-      setConnection(backend.connection);
-    });
+      const rowSync = createRowSync({
+        push: (ops) => backend.push(ops),
+        onError: (errors) => {
+          const msg = errors.map((e) => e.message).join('; ');
+          setError(msg);
+        },
+      });
+      rowSyncRef.current = rowSync;
 
-    // Subscribe to inbound changes (no-op in LOCAL mode)
-    const unsub = backend.subscribe((inbound) => {
-      setStateRaw(inbound);
-      baselineRef.current = inbound;
+      backend.load().then((loaded) => {
+        if (cancelled) return;
+        setStateRaw(loaded);
+        baselineRef.current = loaded;
+        setConnection(backend.connection);
+      });
+
+      // Subscribe to inbound changes (no-op in LOCAL mode)
+      unsub = backend.subscribe((inbound) => {
+        setStateRaw(inbound);
+        baselineRef.current = inbound;
+      });
     });
 
     // Flush on pagehide and visibilitychange → hidden
-    const onPageHide = () => rowSync.flush();
+    const onPageHide = () => rowSyncRef.current?.flush();
     const onVisibility = () => {
-      if (document.visibilityState === 'hidden') rowSync.flush();
+      if (document.visibilityState === 'hidden') rowSyncRef.current?.flush();
     };
     window.addEventListener('pagehide', onPageHide);
     document.addEventListener('visibilitychange', onVisibility);
 
     return () => {
-      unsub();
-      rowSync.destroy();
-      backend.destroy();
+      cancelled = true;
+      unsub?.();
+      rowSyncRef.current?.destroy();
+      backendRef.current?.destroy();
       window.removeEventListener('pagehide', onPageHide);
       document.removeEventListener('visibilitychange', onVisibility);
     };

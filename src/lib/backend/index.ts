@@ -22,12 +22,15 @@ export function getBackendMode(): BackendMode {
   return 'local';
 }
 
-export function getBackend(): PlanBackend {
+/**
+ * Create the appropriate backend. Returns a promise so that REMOTE mode
+ * can dynamically import the Supabase module (keeps it out of the local bundle).
+ */
+export async function getBackend(): Promise<PlanBackend> {
   const mode = getBackendMode();
   if (mode === 'remote') {
-    // TODO Phase 2 step 5: return createSupabaseBackend()
-    // For now, fall back to local.
-    return createLocalBackend();
+    const { createSupabaseBackend } = await import('./supabase/backend');
+    return createSupabaseBackend();
   }
   return createLocalBackend();
 }

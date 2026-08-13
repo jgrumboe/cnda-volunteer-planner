@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { EventDay, Person, PlanState, Task } from '../types';
+import { getBackendMode } from '../lib/backend/index';
 import {
   detectSheetKind,
   importFormResponses,
@@ -170,7 +171,7 @@ export function ImportDialog({
         </label>
         <p className="hint" style={{ margin: '10px 0 0' }}>
           <code>.xlsx</code>, <code>.csv</code>, or a <code>.json</code> backup — read entirely in your
-          browser. Nothing is uploaded anywhere.
+          browser. {getBackendMode() === 'local' ? 'Nothing is uploaded anywhere.' : 'Changes sync to all connected organizers.'}
         </p>
       </div>
 

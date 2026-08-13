@@ -13,6 +13,7 @@
     "selftest": "tsc tests/selftest.ts --ignoreConfig --outDir .selftest --module commonjs --moduleResolution node --target es2022 --esModuleInterop --skipLibCheck --strict --ignoreDeprecations 6.0 --types node && echo '{\"type\":\"commonjs\"}' > .selftest/package.json && node .selftest/tests/selftest.js"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.112.3",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },

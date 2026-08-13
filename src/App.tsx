@@ -15,6 +15,7 @@ import { RulesPanel } from './components/RulesPanel';
 import { ConfirmButton } from './components/ConfirmButton';
 import { NowView } from './components/NowView';
 import { usePlan } from './lib/usePlan';
+import { getBackendMode } from './lib/backend/index';
 
 type Tab = 'now' | 'board' | 'people' | 'tasks' | 'balance';
 
@@ -178,7 +179,7 @@ export default function App() {
       <div className="topbar">
         <div className="brand">
           <strong>{state.eventName}</strong>
-          <span>Volunteer &amp; task planner · data stays in this browser</span>
+          <span>Volunteer &amp; task planner · {getBackendMode() === 'local' ? 'data stays in this browser' : 'live · shared with your team'}</span>
         </div>
 
         <nav className="tabs">
