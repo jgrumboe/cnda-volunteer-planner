@@ -1,0 +1,28 @@
+{
+  "name": "cnda-volunteer-planner",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "oxlint",
+    "preview": "vite preview",
+    "typecheck": "tsc -b --noEmit",
+    "promo": "node scripts/promo.mjs",
+    "selftest": "tsc tests/selftest.ts --ignoreConfig --outDir .selftest --module commonjs --moduleResolution node --target es2022 --esModuleInterop --skipLibCheck --strict --ignoreDeprecations 6.0 --types node && echo '{\"type\":\"commonjs\"}' > .selftest/package.json && node .selftest/tests/selftest.js"
+  },
+  "dependencies": {
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.4",
+    "oxlint": "^1.75.0",
+    "typescript": "~6.0.2",
+    "vite": "^8.2.0"
+  }
+}
