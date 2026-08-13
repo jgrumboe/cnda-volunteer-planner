@@ -266,6 +266,11 @@ export default function App() {
               danger
               onConfirm={resetAll}
             />
+            {getBackendMode() === 'remote' ? (
+              <button className="btn ghost" onClick={auth.signOut} title="Sign out">
+                Sign out
+              </button>
+            ) : null}
           </div>
         ) : (
           <div className="actions">
@@ -275,6 +280,11 @@ export default function App() {
             <button className="btn" onClick={() => exportPeopleCsv(state)} title="Per-person schedule, as CSV">
               Export people
             </button>
+            {getBackendMode() === 'remote' ? (
+              <button className="btn ghost" onClick={auth.signOut} title="Sign out">
+                Sign out
+              </button>
+            ) : null}
           </div>
         )}
       </div>
