@@ -276,3 +276,51 @@ input[type="checkbox"] { accent-color: var(--accent); cursor: pointer; }
 }
 .warn-chip.bad { background: #241a1c; color: var(--bad); border-color: #5a2a2f; }
 .warn-chip.ok { background: #14261f; color: var(--ok); border-color: #1f4535; }
+
+/* ---------------------------------------------------------------- now view */
+.now-view { max-width: 640px; }
+
+.now-banner {
+  background: var(--accent-dim); color: var(--text);
+  padding: 6px 12px; border-radius: 6px; font-size: 12px;
+  margin-bottom: 12px; font-family: var(--mono);
+}
+
+.now-clock {
+  font-size: 32px; font-weight: 700; font-family: var(--mono);
+  margin-bottom: 20px;
+}
+.now-clock .now-date { font-size: 14px; color: var(--faint); font-weight: 400; margin-left: 10px; }
+
+.now-phase-message { margin-top: 24px; }
+.now-phase-message h2 { margin: 0 0 6px; font-size: 18px; }
+.now-phase-message p { margin: 0; color: var(--muted); }
+
+.now-section { margin-bottom: 24px; }
+.now-section h3 {
+  margin: 0 0 10px; font-size: 11px; text-transform: uppercase;
+  letter-spacing: .04em; color: var(--faint); font-weight: 600;
+}
+
+.now-cards { display: flex; flex-direction: column; gap: 8px; }
+
+.now-card {
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 12px 14px;
+}
+.now-card-now { border-left: 3px solid var(--ok); }
+.now-card-next { border-left: 3px solid var(--accent); }
+.now-card-later { border-left: 3px solid var(--border-strong); }
+
+.now-card-header { display: flex; align-items: baseline; gap: 10px; }
+.now-card-title { font-weight: 600; flex: 1; }
+.now-card-time { font-family: var(--mono); font-size: 12px; color: var(--muted); white-space: nowrap; }
+
+.now-card-countdown { font-size: 12px; color: var(--accent); margin-top: 4px; }
+
+.now-card-people { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.now-card-person {
+  font-size: 12px; padding: 2px 8px; border-radius: 10px;
+  background: var(--panel-2); border: 1px solid var(--border); color: var(--muted);
+}
+.now-card-nobody { font-size: 12px; color: var(--faint); font-style: italic; }

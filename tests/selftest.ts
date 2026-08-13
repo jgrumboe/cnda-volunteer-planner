@@ -1,5 +1,5 @@
 /**
- * Self-test for the scheduling core. No test framework — bundled with esbuild and run on Node.
+ * Self-test for the scheduling core. No test framework — compiled with tsc and run on Node.
  *   npm run selftest
  */
 
@@ -9,6 +9,7 @@ import { createSeedState } from '../src/lib/seed';
 import { overlaps, parseTimeRange } from '../src/lib/time';
 import { parseCsv } from '../src/lib/xlsx';
 import { inferCategory, matchDayIds, mergePeople, newId } from '../src/lib/importers';
+import { nowInEventTz, eventPhase, runningNow, upNext } from '../src/lib/clock';
 import { DAYS } from '../src/lib/seed';
 import type { PlanState } from '../src/types';
 
@@ -267,6 +268,95 @@ ok(
   'only the 8 organizers can work Monday',
   `${cands.filter((c) => c.reject === null).length} eligible`,
 );
+
+// ---------------------------------------------------------------- clock
+section('clock: nowInEventTz');
+{
+  // 2026-09-29 at 10:15 UTC. Vienna is UTC+2 in September (CEST), so wall clock = 12:15.
+  const at = new Date('2026-09-29T10:15:00Z');
+  const w = nowInEventTz(at);
+  eq(w.date, '2026-09-29', 'date in Vienna timezone');
+  eq(w.minutes, 12 * 60 + 15, 'minutes = 12:15 in Vienna');
+}
+{
+  // Just after midnight UTC on Sep 30 — still Sep 29 in Vienna? No: UTC+2 means
+  // 2026-09-29T22:30Z = 2026-09-30T00:30 Vienna.
+  const at = new Date('2026-09-29T22:30:00Z');
+  const w = nowInEventTz(at);
+  eq(w.date, '2026-09-30', 'rolls to next day in Vienna when past midnight locally');
+  eq(w.minutes, 30, '00:30 Vienna = 30 minutes');
+}
+
+section('clock: eventPhase');
+{
+  // Event days: Mon 2026-09-28, Tue 2026-09-29, Wed 2026-09-30
+  const s = createSeedState();
+  eq(eventPhase(s, { date: '2026-09-27', minutes: 600 }), 'before', 'day before event');
+  eq(eventPhase(s, { date: '2026-09-28', minutes: 600 }), 'during', 'first event day');
+  eq(eventPhase(s, { date: '2026-09-29', minutes: 600 }), 'during', 'middle event day');
+  eq(eventPhase(s, { date: '2026-09-30', minutes: 600 }), 'during', 'last event day');
+  eq(eventPhase(s, { date: '2026-10-01', minutes: 600 }), 'after', 'day after event');
+}
+
+section('clock: runningNow');
+{
+  const s = createSeedState();
+  // "Setup afternoon" on Monday: 13:00-18:00 (780-1080).
+  // At 14:00 (840 min) it should be running.
+  const running = runningNow(s, { date: '2026-09-28', minutes: 840 });
+  ok(running.some((t) => t.title === 'Setup afternoon'), 'setup afternoon is running at 14:00');
+  ok(running.some((t) => t.title === 'Deliveries (RB, Party.rent, ...)'), 'deliveries running at 14:00');
+
+  // Half-open: at exactly end (1080 = 18:00), the task is NOT running.
+  const atEnd = runningNow(s, { date: '2026-09-28', minutes: 1080 });
+  ok(!atEnd.some((t) => t.title === 'Setup afternoon'), 'half-open: task not running at its end time');
+
+  // At exactly start (780 = 13:00), the task IS running.
+  const atStart = runningNow(s, { date: '2026-09-28', minutes: 780 });
+  ok(atStart.some((t) => t.title === 'Setup afternoon'), 'task is running at its start time');
+
+  // Wrong day returns nothing.
+  const wrongDay = runningNow(s, { date: '2026-09-29', minutes: 840 });
+  ok(!wrongDay.some((t) => t.title === 'Setup afternoon'), 'monday task not found on tuesday');
+}
+
+section('clock: upNext');
+{
+  const s = createSeedState();
+  // At 11:30 (690 min) on Monday, "Deliveries" (12:00=720) and "Setup" (13:00=780) are next.
+  const next = upNext(s, { date: '2026-09-28', minutes: 690 });
+  ok(next.length > 0, 'has upcoming tasks');
+  // Should be sorted by start: first one starts at 720 (Deliveries).
+  eq(next[0].start, 720, 'upNext sorted: first is earliest start');
+  // "Registration setup" at 16:00 should come after "Setup afternoon" at 13:00
+  const setupIdx = next.findIndex((t) => t.title === 'Setup afternoon');
+  const regIdx = next.findIndex((t) => t.title === 'Registration setup');
+  ok(setupIdx < regIdx, 'setup afternoon comes before registration setup in upNext');
+
+  // At 18:01 on Monday, nothing is next (all tasks ended by 18:00).
+  const late = upNext(s, { date: '2026-09-28', minutes: 1081 });
+  eq(late.length, 0, 'nothing up next after all tasks end');
+}
+
+section('clock: personId filter');
+{
+  const s = createSeedState();
+  const person = s.people[0]; // first organizer
+  const task = s.tasks.find((t) => t.dayId === 'mon' && t.title === 'Setup afternoon')!;
+  const withA: PlanState = {
+    ...s,
+    assignments: [{ taskId: task.id, personId: person.id, pinned: true, source: 'manual' }],
+  };
+
+  // At 14:00 Monday, with assignment, person sees the task.
+  const mine = runningNow(withA, { date: '2026-09-28', minutes: 840 }, person.id);
+  eq(mine.length, 1, 'person sees their assigned running task');
+  eq(mine[0].id, task.id, 'correct task returned');
+
+  // Without assignment, person sees nothing.
+  const empty = runningNow(s, { date: '2026-09-28', minutes: 840 }, person.id);
+  eq(empty.length, 0, 'unassigned person sees no running tasks');
+}
 
 // ---------------------------------------------------------------- summary
 console.log(

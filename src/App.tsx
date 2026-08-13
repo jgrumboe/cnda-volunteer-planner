@@ -14,10 +14,12 @@ import { ProposalDialog } from './components/ProposalDialog';
 import { ImportDialog } from './components/ImportDialog';
 import { RulesPanel } from './components/RulesPanel';
 import { ConfirmButton } from './components/ConfirmButton';
+import { NowView } from './components/NowView';
 
-type Tab = 'board' | 'people' | 'tasks' | 'balance';
+type Tab = 'now' | 'board' | 'people' | 'tasks' | 'balance';
 
 const TABS: { id: Tab; label: string }[] = [
+  { id: 'now', label: 'Now' },
   { id: 'board', label: 'Board' },
   { id: 'people', label: 'People' },
   { id: 'tasks', label: 'Tasks' },
@@ -244,6 +246,7 @@ export default function App() {
       ) : null}
 
       <div className="content">
+        {tab === 'now' ? <NowView state={state} /> : null}
         {tab === 'board' ? (
           <BoardView
             state={state}
