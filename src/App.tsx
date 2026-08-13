@@ -14,7 +14,9 @@ import { ImportDialog } from './components/ImportDialog';
 import { RulesPanel } from './components/RulesPanel';
 import { ConfirmButton } from './components/ConfirmButton';
 import { NowView } from './components/NowView';
+import { NotInvited } from './components/SignIn';
 import { usePlan } from './lib/usePlan';
+import { useAuth } from './lib/auth';
 import { getBackendMode } from './lib/backend/index';
 
 type Tab = 'now' | 'board' | 'people' | 'tasks' | 'balance';
@@ -28,7 +30,8 @@ const TABS: { id: Tab; label: string }[] = [
 ];
 
 export default function App() {
-  const { state, setState, canEdit, error, setError } = usePlan();
+  const { state, setState, canEdit, connection, error, setError } = usePlan();
+  const auth = useAuth();
   const [tab, setTab] = useState<Tab>('board');
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [showImport, setShowImport] = useState(false);
@@ -173,6 +176,22 @@ export default function App() {
 
   const suggestedCount = state.assignments.filter((a) => !a.pinned).length;
   const problems = conflicts.length;
+
+  // Not a member — show dedicated screen
+  if (error === 'not_a_member' && auth.session) {
+    return <NotInvited email={auth.session.email} onSignOut={auth.signOut} />;
+  }
+
+  // Still loading in remote mode
+  if (connection === 'connecting' && !state.days.length) {
+    return (
+      <div className="signin-container">
+        <div className="signin-card">
+          <p style={{ color: 'var(--muted)' }}>Loading plan...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="app">

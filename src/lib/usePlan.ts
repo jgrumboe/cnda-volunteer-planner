@@ -58,6 +58,15 @@ export function usePlan(): UsePlanResult {
         setStateRaw(loaded);
         baselineRef.current = loaded;
         setConnection(backend.connection);
+      }).catch((err: Error) => {
+        if (cancelled) return;
+        if (err.message === 'not_a_member') {
+          setConnection('error');
+          setError('not_a_member');
+        } else {
+          setConnection('error');
+          setError(err.message);
+        }
       });
 
       // Subscribe to inbound changes (no-op in LOCAL mode)
