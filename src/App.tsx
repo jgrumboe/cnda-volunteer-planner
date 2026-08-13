@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { Assignment, Person, PlanState, Rules, Task } from './types';
+import { useCallback, useMemo, useState } from 'react';
+import type { Assignment, Person, Rules, Task } from './types';
 import { findConflicts, totalOpenSlots, withPrunedAssignments, type Conflict } from './lib/plan';
 import { proposeAssignments, type Proposal } from './lib/assign';
 import { createSeedState } from './lib/seed';
-import { loadState, saveState } from './lib/storage';
 import { exportJson, exportPeopleCsv, exportTasksCsv } from './lib/exporters';
 import { mergePeople } from './lib/importers';
 import { BoardView } from './components/BoardView';
@@ -15,6 +14,7 @@ import { ImportDialog } from './components/ImportDialog';
 import { RulesPanel } from './components/RulesPanel';
 import { ConfirmButton } from './components/ConfirmButton';
 import { NowView } from './components/NowView';
+import { usePlan } from './lib/usePlan';
 
 type Tab = 'now' | 'board' | 'people' | 'tasks' | 'balance';
 
@@ -27,20 +27,25 @@ const TABS: { id: Tab; label: string }[] = [
 ];
 
 export default function App() {
-  const [state, setState] = useState<PlanState>(() => loadState() ?? createSeedState());
+  const { state, setState, error, setError } = usePlan();
   const [tab, setTab] = useState<Tab>('board');
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [showImport, setShowImport] = useState(false);
   const [showRules, setShowRules] = useState(false);
   const [thinking, setThinking] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    saveState(state);
-  }, [state]);
+  const { days, people, tasks, assignments, rules } = state;
 
-  const conflicts = useMemo(() => findConflicts(state), [state]);
-  const openSlots = useMemo(() => totalOpenSlots(state), [state]);
+  const conflicts = useMemo(
+    () => findConflicts(state),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [days, people, tasks, assignments, rules],
+  );
+  const openSlots = useMemo(
+    () => totalOpenSlots(state),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [tasks, assignments],
+  );
 
   const conflictsByPerson = useMemo(() => {
     const map = new Map<string, Conflict[]>();
@@ -55,9 +60,9 @@ export default function App() {
 
   const understaffedTaskIds = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const a of state.assignments) counts.set(a.taskId, (counts.get(a.taskId) ?? 0) + 1);
-    return new Set(state.tasks.filter((t) => (counts.get(t.id) ?? 0) < t.needed).map((t) => t.id));
-  }, [state.assignments, state.tasks]);
+    for (const a of assignments) counts.set(a.taskId, (counts.get(a.taskId) ?? 0) + 1);
+    return new Set(tasks.filter((t) => (counts.get(t.id) ?? 0) < t.needed).map((t) => t.id));
+  }, [assignments, tasks]);
 
   const assign = useCallback((taskId: string, personId: string) => {
     setState((s) =>
@@ -65,14 +70,14 @@ export default function App() {
         ? s
         : { ...s, assignments: [...s.assignments, { taskId, personId, pinned: true, source: 'manual' }] },
     );
-  }, []);
+  }, [setState]);
 
   const unassign = useCallback((taskId: string, personId: string) => {
     setState((s) => ({
       ...s,
       assignments: s.assignments.filter((a) => !(a.taskId === taskId && a.personId === personId)),
     }));
-  }, []);
+  }, [setState]);
 
   const togglePin = useCallback((taskId: string, personId: string) => {
     setState((s) => ({
@@ -81,7 +86,7 @@ export default function App() {
         a.taskId === taskId && a.personId === personId ? { ...a, pinned: !a.pinned } : a,
       ),
     }));
-  }, []);
+  }, [setState]);
 
   const suggest = (seed = Date.now()) => {
     setThinking(true);

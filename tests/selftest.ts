@@ -10,6 +10,9 @@ import { overlaps, parseTimeRange } from '../src/lib/time';
 import { parseCsv } from '../src/lib/xlsx';
 import { inferCategory, matchDayIds, mergePeople, newId } from '../src/lib/importers';
 import { nowInEventTz, eventPhase, runningNow, upNext } from '../src/lib/clock';
+import { diffById, shallowRowEqual, assignmentKey, diffAll } from '../src/lib/backend/diff';
+import { mergeInbound } from '../src/lib/backend/merge';
+import { createRowSync } from '../src/lib/backend/rowsync';
 import { DAYS } from '../src/lib/seed';
 import type { PlanState } from '../src/types';
 
@@ -358,19 +361,223 @@ section('clock: personId filter');
   eq(empty.length, 0, 'unassigned person sees no running tasks');
 }
 
-// ---------------------------------------------------------------- summary
-console.log(
-  `\n${failures === 0 ? 'PASS' : 'FAIL'}: ${checks - failures}/${checks} checks passed.`,
-);
-console.log(
-  `Filled ${proposal.additions.length}/${proposal.openSlotsBefore} open slots; ` +
-    `${proposal.unfilled.reduce((s, u) => s + u.count, 0)} slots could not be filled.`,
-);
-if (proposal.unfilled.length > 0) {
-  console.log('Unfillable:');
-  for (const u of proposal.unfilled) {
-    const t = taskById.get(u.taskId);
-    console.log(`  ${t?.title} (${t?.dayId}) x${u.count} — ${u.reasons.join(', ') || 'nobody eligible'}`);
-  }
+// ---------------------------------------------------------------- diff
+section('diff: shallowRowEqual');
+{
+  const a = { id: 'x', name: 'Alice', tags: ['a', 'b'], active: true };
+  const b = { id: 'x', name: 'Alice', tags: ['a', 'b'], active: true };
+  ok(shallowRowEqual(a, b), 'equal objects with arrays');
+
+  const c = { id: 'x', name: 'Alice', tags: ['a', 'c'], active: true };
+  ok(!shallowRowEqual(a, c), 'different array element');
+
+  const d = { id: 'x', name: 'Alice', tags: ['a', 'b'], active: false };
+  ok(!shallowRowEqual(a, d), 'different boolean');
+
+  const e = { id: 'x', name: 'Alice', tags: ['a', 'b'] };
+  ok(!shallowRowEqual(a, e), 'missing key');
 }
-process.exit(failures === 0 ? 0 : 1);
+
+section('diff: diffById');
+{
+  type Row = { id: string; val: number };
+  const prev: Row[] = [{ id: 'a', val: 1 }, { id: 'b', val: 2 }, { id: 'c', val: 3 }];
+  const next: Row[] = [{ id: 'a', val: 1 }, { id: 'b', val: 99 }, { id: 'd', val: 4 }];
+
+  const result = diffById(prev, next, 'people', (r) => r.id);
+  ok(!result.unchanged, 'has changes');
+
+  const upserts = result.ops.filter((o) => o.type === 'upsert');
+  const deletes = result.ops.filter((o) => o.type === 'delete');
+  eq(upserts.length, 2, '2 upserts (changed b + new d)');
+  eq(deletes.length, 1, '1 delete (removed c)');
+  eq(deletes[0].id, 'c', 'delete targets c');
+  ok(upserts.some((o) => o.id === 'b'), 'upsert for changed row b');
+  ok(upserts.some((o) => o.id === 'd'), 'upsert for new row d');
+
+  // No-op diff
+  const same = diffById(prev, prev, 'people', (r) => r.id);
+  ok(same.unchanged, 'identical arrays yield no ops');
+  eq(same.ops.length, 0, 'zero ops');
+}
+
+section('diff: diffAll');
+{
+  const s = createSeedState();
+  // Unchanged state produces zero ops.
+  const ops = diffAll(
+    { days: s.days, people: s.people, tasks: s.tasks, assignments: s.assignments },
+    { days: s.days, people: s.people, tasks: s.tasks, assignments: s.assignments },
+  );
+  eq(ops.length, 0, 'unchanged state → zero ops');
+
+  // Changing one person produces exactly one op.
+  const modified = [...s.people];
+  modified[0] = { ...modified[0], name: 'Changed Name' };
+  const ops2 = diffAll(
+    { days: s.days, people: s.people, tasks: s.tasks, assignments: s.assignments },
+    { days: s.days, people: modified, tasks: s.tasks, assignments: s.assignments },
+  );
+  eq(ops2.length, 1, 'one person change → one op');
+  eq(ops2[0].type, 'upsert', 'op is an upsert');
+  eq(ops2[0].collection, 'people', 'op targets people');
+}
+
+section('diff: assignmentKey');
+{
+  eq(assignmentKey('t1', 'p1'), 't1::p1', 'key format');
+}
+
+// ---------------------------------------------------------------- merge
+section('merge: identity preservation');
+{
+  const s = createSeedState();
+
+  // Upsert that equals local row → same state reference
+  const person = s.people[0];
+  const result = mergeInbound(s, {
+    collection: 'people',
+    type: 'upsert',
+    id: person.id,
+    payload: person as unknown as Record<string, unknown>,
+  });
+  ok(result === s, 'equal upsert returns same state reference');
+
+  // Upsert of unknown id → new state, only people array changes
+  const newPerson = { id: 'p-new', name: 'New', isOrganizer: false, availableDayIds: [], multiShift: false, maxShifts: null, tags: [] };
+  const added = mergeInbound(s, {
+    collection: 'people',
+    type: 'upsert',
+    id: 'p-new',
+    payload: newPerson as unknown as Record<string, unknown>,
+  });
+  ok(added !== s, 'new row → different state');
+  ok(added.tasks === s.tasks, 'tasks array unchanged by reference');
+  ok(added.days === s.days, 'days array unchanged by reference');
+  ok(added.assignments === s.assignments, 'assignments unchanged by reference');
+  eq(added.people.length, s.people.length + 1, 'people array grew by one');
+
+  // Delete of absent id → same state reference
+  const noOp = mergeInbound(s, {
+    collection: 'people',
+    type: 'delete',
+    id: 'nonexistent',
+  });
+  ok(noOp === s, 'delete of absent id returns same state');
+
+  // Delete of existing id → new state without that row
+  const deleted = mergeInbound(s, {
+    collection: 'people',
+    type: 'delete',
+    id: person.id,
+  });
+  ok(deleted !== s, 'delete returns new state');
+  eq(deleted.people.length, s.people.length - 1, 'one fewer person');
+  ok(!deleted.people.some((p) => p.id === person.id), 'deleted person is gone');
+}
+
+section('merge: pending shield (upserts blocked, deletes pass)');
+{
+  const s = createSeedState();
+  const person = s.people[0];
+
+  // Upsert blocked by pending
+  const shielded = mergeInbound(s, {
+    collection: 'people',
+    type: 'upsert',
+    id: person.id,
+    payload: { ...person, name: 'Remote Edit' } as unknown as Record<string, unknown>,
+  }, { pendingIds: new Set([person.id]) });
+  ok(shielded === s, 'upsert shielded by pending write');
+
+  // Delete NOT shielded
+  const notShielded = mergeInbound(s, {
+    collection: 'people',
+    type: 'delete',
+    id: person.id,
+  }, { pendingIds: new Set([person.id]) });
+  ok(notShielded !== s, 'delete is never shielded');
+  eq(notShielded.people.length, s.people.length - 1, 'person deleted despite pending');
+}
+
+section('merge: stale event dropped');
+{
+  const s = createSeedState();
+  const person = s.people[0];
+  const clocks = {
+    days: new Map(),
+    people: new Map([[person.id, '2026-09-29T12:00:00Z']]),
+    tasks: new Map(),
+    assignments: new Map(),
+  };
+
+  // Older timestamp → dropped
+  const stale = mergeInbound(s, {
+    collection: 'people',
+    type: 'upsert',
+    id: person.id,
+    payload: { ...person, name: 'Stale' } as unknown as Record<string, unknown>,
+    timestamp: '2026-09-29T11:00:00Z',
+  }, { clocks });
+  ok(stale === s, 'stale event is dropped');
+
+  // Newer timestamp → applied
+  const fresh = mergeInbound(s, {
+    collection: 'people',
+    type: 'upsert',
+    id: person.id,
+    payload: { ...person, name: 'Fresh' } as unknown as Record<string, unknown>,
+    timestamp: '2026-09-29T13:00:00Z',
+  }, { clocks });
+  ok(fresh !== s, 'fresh event is applied');
+  eq(fresh.people.find((p) => p.id === person.id)?.name, 'Fresh', 'name updated');
+}
+
+// ---------------------------------------------------------------- rowsync
+section('rowsync: debounce and flush');
+void (async () => {
+  const pushed: { ops: import('../src/lib/backend/types').RowOp[]; at: number }[] = [];
+  let time = 0;
+  const sync = createRowSync({
+    debounceMs: 100,
+    maxDelayMs: 500,
+    now: () => time,
+    push: async (ops) => { pushed.push({ ops, at: time }); return []; },
+  });
+
+  // Queue an op — shouldn't push immediately (but setTimeout is real, so we flush manually)
+  sync.queue({ collection: 'people', type: 'upsert', id: 'p1', payload: { id: 'p1', name: 'A' } });
+  ok(sync.pendingIds().has('p1'), 'p1 is pending after queue');
+
+  // Flush sends it
+  await sync.flush();
+  eq(pushed.length, 1, 'flush sends the pending op');
+  eq(pushed[0].ops[0].id, 'p1', 'correct op sent');
+  ok(!sync.pendingIds().has('p1'), 'p1 no longer pending after flush');
+
+  // Multiple ops for same id — only last payload survives
+  sync.queue({ collection: 'people', type: 'upsert', id: 'p2', payload: { id: 'p2', name: 'B1' } });
+  sync.queue({ collection: 'people', type: 'upsert', id: 'p2', payload: { id: 'p2', name: 'B2' } });
+  await sync.flush();
+  eq(pushed.length, 2, 'second flush');
+  eq((pushed[1].ops[0].payload as Record<string, unknown>)?.name, 'B2', 'last write wins');
+
+  sync.destroy();
+
+  // ---------------------------------------------------------------- summary
+  console.log(
+    `\n${failures === 0 ? 'PASS' : 'FAIL'}: ${checks - failures}/${checks} checks passed.`,
+  );
+  console.log(
+    `Filled ${proposal.additions.length}/${proposal.openSlotsBefore} open slots; ` +
+      `${proposal.unfilled.reduce((s, u) => s + u.count, 0)} slots could not be filled.`,
+  );
+  if (proposal.unfilled.length > 0) {
+    console.log('Unfillable:');
+    for (const u of proposal.unfilled) {
+      const t = taskById.get(u.taskId);
+      console.log(`  ${t?.title} (${t?.dayId}) x${u.count} — ${u.reasons.join(', ') || 'nobody eligible'}`);
+    }
+  }
+  process.exit(failures === 0 ? 0 : 1);
+})();
