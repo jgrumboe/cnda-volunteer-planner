@@ -19,6 +19,8 @@ import { saveState } from './storage';
 export interface UsePlanResult {
   state: PlanState;
   setState: React.Dispatch<React.SetStateAction<PlanState>>;
+  /** Atomically replace the entire plan (for import/restore/reset). */
+  replacePlan: (state: PlanState) => Promise<void>;
   connection: ConnectionState;
   /** True when the current user has write access (organizer or local mode). */
   canEdit: boolean;
@@ -130,11 +132,33 @@ export function usePlan(): UsePlanResult {
     [],
   );
 
+  // Atomic full-plan replacement — uses the backend's replacePlan RPC in REMOTE mode.
+  // This avoids the FK ordering issues that row-level diffs cause.
+  const replacePlan = useCallback(async (newState: PlanState) => {
+    // Flush any pending row writes first
+    await rowSyncRef.current?.flush();
+
+    const backend = backendRef.current;
+    if (backend) {
+      const err = await backend.replacePlan(newState);
+      if (err) {
+        setError(err.message);
+        return;
+      }
+    }
+
+    // Update local state and baseline so the next diff doesn't re-send everything
+    setStateRaw(newState);
+    baselineRef.current = newState;
+    saveState(newState);
+  }, []);
+
   // Return a loading state while the backend hasn't loaded yet
   if (!state) {
     return {
       state: { version: 1, eventName: '', days: [], people: [], tasks: [], assignments: [], rules: {} as PlanState['rules'] },
       setState,
+      replacePlan,
       connection: 'connecting',
       canEdit: false,
       error: null,
@@ -145,5 +169,5 @@ export function usePlan(): UsePlanResult {
   // In LOCAL mode, always editable. In REMOTE mode, driven by session role (TODO).
   const canEdit = connection === 'local' || connection === 'live';
 
-  return { state, setState, connection, canEdit, error, setError };
+  return { state, setState, replacePlan, connection, canEdit, error, setError };
 }

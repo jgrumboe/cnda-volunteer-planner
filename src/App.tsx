@@ -30,7 +30,7 @@ const TABS: { id: Tab; label: string }[] = [
 ];
 
 export default function App() {
-  const { state, setState, canEdit, connection, error, setError } = usePlan();
+  const { state, setState, replacePlan, canEdit, connection, error, setError } = usePlan();
   const auth = useAuth();
   const [tab, setTab] = useState<Tab>('board');
   const [proposal, setProposal] = useState<Proposal | null>(null);
@@ -165,8 +165,7 @@ export default function App() {
   };
 
   const resetAll = () => {
-    // No clearState() needed — the persistence effect writes the fresh seed a tick later.
-    setState(createSeedState());
+    replacePlan(createSeedState());
     setError(null);
   };
 
@@ -326,7 +325,7 @@ export default function App() {
           state={state}
           onApply={applyImport}
           onRestore={(restored) => {
-            setState(restored);
+            replacePlan(restored);
             setShowImport(false);
           }}
           onClose={() => setShowImport(false)}
