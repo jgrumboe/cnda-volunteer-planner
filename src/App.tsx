@@ -16,6 +16,7 @@ import { ConfirmButton } from './components/ConfirmButton';
 import { NowView } from './components/NowView';
 import { NotInvited } from './components/SignIn';
 import { MyShiftsView } from './components/MyShiftsView';
+import { AccessPanel } from './components/AccessPanel';
 import { usePlan } from './lib/usePlan';
 import { useAuth } from './lib/auth';
 import { getBackendMode } from './lib/backend/index';
@@ -39,6 +40,7 @@ export default function App() {
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [showImport, setShowImport] = useState(false);
   const [showRules, setShowRules] = useState(false);
+  const [showAccess, setShowAccess] = useState(false);
   const [thinking, setThinking] = useState(false);
 
   const { days, people, tasks, assignments, rules } = state;
@@ -241,6 +243,9 @@ export default function App() {
             <button className="btn" onClick={() => setShowRules(true)}>
               Rules
             </button>
+            <button className="btn" onClick={() => setShowAccess(true)}>
+              Access
+            </button>
             <button className="btn" onClick={() => setShowImport(true)}>
               Import
             </button>
@@ -341,6 +346,13 @@ export default function App() {
           rules={state.rules}
           onChange={(rules: Rules) => setState((s) => ({ ...s, rules }))}
           onClose={() => setShowRules(false)}
+        />
+      ) : null}
+
+      {showAccess ? (
+        <AccessPanel
+          state={state}
+          onClose={() => setShowAccess(false)}
         />
       ) : null}
     </div>
