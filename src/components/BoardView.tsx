@@ -7,6 +7,7 @@ import { Modal } from './Modal';
 
 interface Props {
   state: PlanState;
+  canEdit: boolean;
   conflictsByPerson: Map<string, Conflict[]>;
   understaffedTaskIds: Set<string>;
   onAssign: (taskId: string, personId: string) => void;
@@ -16,6 +17,7 @@ interface Props {
 
 export function BoardView({
   state,
+  canEdit,
   conflictsByPerson,
   understaffedTaskIds,
   onAssign,
@@ -117,17 +119,19 @@ export function BoardView({
                                   : undefined
                               }
                             >
-                              <button
-                                className={`pin ${a.pinned ? 'on' : ''}`}
-                                title={
-                                  a.pinned
-                                    ? 'Pinned — the allocator will not move this'
-                                    : 'Suggested — a reshuffle may replace it'
-                                }
-                                onClick={() => onTogglePin(task.id, a.personId)}
-                              >
-                                {a.pinned ? '📌' : '○'}
-                              </button>
+                              {canEdit ? (
+                                <button
+                                  className={`pin ${a.pinned ? 'on' : ''}`}
+                                  title={
+                                    a.pinned
+                                      ? 'Pinned — the allocator will not move this'
+                                      : 'Suggested — a reshuffle may replace it'
+                                  }
+                                  onClick={() => onTogglePin(task.id, a.personId)}
+                                >
+                                  {a.pinned ? '📌' : '○'}
+                                </button>
+                              ) : null}
                               <span className="name">{person?.name ?? 'unknown'}</span>
                               {relevant.length > 0 ? (
                                 <span
@@ -137,13 +141,15 @@ export function BoardView({
                                   ⚠
                                 </span>
                               ) : null}
-                              <button
-                                className="remove"
-                                title="Remove from task"
-                                onClick={() => onUnassign(task.id, a.personId)}
-                              >
-                                ✕
-                              </button>
+                              {canEdit ? (
+                                <button
+                                  className="remove"
+                                  title="Remove from task"
+                                  onClick={() => onUnassign(task.id, a.personId)}
+                                >
+                                  ✕
+                                </button>
+                              ) : null}
                             </li>
                           );
                         })}
@@ -155,9 +161,11 @@ export function BoardView({
                       ))}
                     </ul>
 
-                    <button className="btn tiny ghost" style={{ marginTop: 6 }} onClick={() => setPicker(task)}>
-                      + assign someone
-                    </button>
+                    {canEdit ? (
+                      <button className="btn tiny ghost" style={{ marginTop: 6 }} onClick={() => setPicker(task)}>
+                        + assign someone
+                      </button>
+                    ) : null}
                   </div>
                 );
               })}

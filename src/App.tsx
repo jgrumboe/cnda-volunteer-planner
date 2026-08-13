@@ -28,7 +28,7 @@ const TABS: { id: Tab; label: string }[] = [
 ];
 
 export default function App() {
-  const { state, setState, error, setError } = usePlan();
+  const { state, setState, canEdit, error, setError } = usePlan();
   const [tab, setTab] = useState<Tab>('board');
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [showImport, setShowImport] = useState(false);
@@ -207,39 +207,50 @@ export default function App() {
 
         <div className="spacer" />
 
-        <div className="actions">
-          <button className="btn primary" onClick={() => suggest()} disabled={thinking || openSlots === 0}>
-            {thinking ? 'Searching…' : 'Assign open tasks'}
-          </button>
-          {suggestedCount > 0 ? (
-            <button className="btn ghost" onClick={clearSuggestions} title="Remove all unpinned suggestions">
-              Clear {suggestedCount} suggested
+        {canEdit ? (
+          <div className="actions">
+            <button className="btn primary" onClick={() => suggest()} disabled={thinking || openSlots === 0}>
+              {thinking ? 'Searching…' : 'Assign open tasks'}
             </button>
-          ) : null}
-          <button className="btn" onClick={() => setShowRules(true)}>
-            Rules
-          </button>
-          <button className="btn" onClick={() => setShowImport(true)}>
-            Import
-          </button>
-          <button className="btn" onClick={() => exportTasksCsv(state)} title="Tasks with assigned people, as CSV">
-            Export tasks
-          </button>
-          <button className="btn" onClick={() => exportPeopleCsv(state)} title="Per-person schedule, as CSV">
-            Export people
-          </button>
-          <button className="btn ghost" onClick={() => exportJson(state)} title="Full backup you can re-import">
-            Backup
-          </button>
-          <ConfirmButton
-            className="btn ghost danger"
-            label="Reset"
-            question="Discard this plan and start from the seed data?"
-            confirmLabel="Yes, reset"
-            danger
-            onConfirm={resetAll}
-          />
-        </div>
+            {suggestedCount > 0 ? (
+              <button className="btn ghost" onClick={clearSuggestions} title="Remove all unpinned suggestions">
+                Clear {suggestedCount} suggested
+              </button>
+            ) : null}
+            <button className="btn" onClick={() => setShowRules(true)}>
+              Rules
+            </button>
+            <button className="btn" onClick={() => setShowImport(true)}>
+              Import
+            </button>
+            <button className="btn" onClick={() => exportTasksCsv(state)} title="Tasks with assigned people, as CSV">
+              Export tasks
+            </button>
+            <button className="btn" onClick={() => exportPeopleCsv(state)} title="Per-person schedule, as CSV">
+              Export people
+            </button>
+            <button className="btn ghost" onClick={() => exportJson(state)} title="Full backup you can re-import">
+              Backup
+            </button>
+            <ConfirmButton
+              className="btn ghost danger"
+              label="Reset"
+              question="Discard this plan and start from the seed data?"
+              confirmLabel="Yes, reset"
+              danger
+              onConfirm={resetAll}
+            />
+          </div>
+        ) : (
+          <div className="actions">
+            <button className="btn" onClick={() => exportTasksCsv(state)} title="Tasks with assigned people, as CSV">
+              Export tasks
+            </button>
+            <button className="btn" onClick={() => exportPeopleCsv(state)} title="Per-person schedule, as CSV">
+              Export people
+            </button>
+          </div>
+        )}
       </div>
 
       {error ? (
@@ -256,6 +267,7 @@ export default function App() {
         {tab === 'board' ? (
           <BoardView
             state={state}
+            canEdit={canEdit}
             conflictsByPerson={conflictsByPerson}
             understaffedTaskIds={understaffedTaskIds}
             onAssign={assign}
@@ -266,12 +278,14 @@ export default function App() {
         {tab === 'people' ? (
           <PeopleView
             state={state}
+            canEdit={canEdit}
             onChange={(people) => setState((s) => withPrunedAssignments({ ...s, people }))}
           />
         ) : null}
         {tab === 'tasks' ? (
           <TasksView
             state={state}
+            canEdit={canEdit}
             onChange={(tasks) => setState((s) => withPrunedAssignments({ ...s, tasks }))}
           />
         ) : null}

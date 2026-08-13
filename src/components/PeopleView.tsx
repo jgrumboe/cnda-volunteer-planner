@@ -5,10 +5,11 @@ import { newId } from '../lib/importers';
 
 interface Props {
   state: PlanState;
+  canEdit: boolean;
   onChange: (people: Person[]) => void;
 }
 
-export function PeopleView({ state, onChange }: Props) {
+export function PeopleView({ state, canEdit, onChange }: Props) {
   const loads = useMemo(
     () => computeLoads(state.people, state.tasks, state.assignments),
     [state.people, state.tasks, state.assignments],
@@ -93,6 +94,7 @@ export function PeopleView({ state, onChange }: Props) {
         </div>
       </div>
 
+      <fieldset disabled={!canEdit} style={{ border: 'none', padding: 0, margin: 0 }}>
       <table className="grid">
         <thead>
           <tr>
@@ -218,6 +220,7 @@ export function PeopleView({ state, onChange }: Props) {
       <button className="btn" style={{ marginTop: 12 }} onClick={add}>
         + Add person
       </button>
+      </fieldset>
     </>
   );
 }

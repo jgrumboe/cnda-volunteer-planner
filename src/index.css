@@ -324,3 +324,54 @@ input[type="checkbox"] { accent-color: var(--accent); cursor: pointer; }
   background: var(--panel-2); border: 1px solid var(--border); color: var(--muted);
 }
 .now-card-nobody { font-size: 12px; color: var(--faint); font-style: italic; }
+
+/* ---------------------------------------------------------------- sign-in */
+.signin-container {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 100vh; padding: 24px;
+}
+
+.signin-card {
+  background: var(--panel); border: 1px solid var(--border-strong);
+  border-radius: 12px; padding: 32px; max-width: 380px; width: 100%;
+  text-align: center;
+}
+.signin-card h1 { margin: 0 0 4px; font-size: 20px; }
+.signin-subtitle { color: var(--muted); font-size: 13px; margin: 0 0 24px; }
+
+.signin-google { width: 100%; padding: 12px; font-size: 14px; }
+
+.signin-divider {
+  display: flex; align-items: center; gap: 12px;
+  margin: 20px 0; color: var(--faint); font-size: 12px;
+}
+.signin-divider::before, .signin-divider::after {
+  content: ''; flex: 1; height: 1px; background: var(--border);
+}
+
+.signin-form { display: flex; flex-direction: column; gap: 10px; }
+.signin-form input { text-align: center; }
+
+.signin-error {
+  background: #241a1c; border: 1px solid #5a2a2f; border-radius: 6px;
+  padding: 8px 12px; font-size: 13px; color: var(--bad); margin-bottom: 12px;
+}
+
+.signin-success {
+  background: #14261f; border: 1px solid #1f4535; border-radius: 6px;
+  padding: 12px; font-size: 13px; color: var(--ok);
+}
+
+.signin-hint { color: var(--faint); font-size: 12px; margin-top: 20px; }
+
+/* disabled fieldset should look like plain text, not greyed out */
+fieldset:disabled input,
+fieldset:disabled select,
+fieldset:disabled textarea {
+  opacity: 1; color: var(--text);
+  background: transparent; border-color: transparent;
+  cursor: default;
+}
+fieldset:disabled button {
+  display: none;
+}

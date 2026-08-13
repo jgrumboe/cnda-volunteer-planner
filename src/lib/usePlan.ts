@@ -20,6 +20,8 @@ export interface UsePlanResult {
   state: PlanState;
   setState: React.Dispatch<React.SetStateAction<PlanState>>;
   connection: ConnectionState;
+  /** True when the current user has write access (organizer or local mode). */
+  canEdit: boolean;
   error: string | null;
   setError: (err: string | null) => void;
 }
@@ -125,10 +127,14 @@ export function usePlan(): UsePlanResult {
       state: { version: 1, eventName: '', days: [], people: [], tasks: [], assignments: [], rules: {} as PlanState['rules'] },
       setState,
       connection: 'connecting',
+      canEdit: false,
       error: null,
       setError,
     };
   }
 
-  return { state, setState, connection, error, setError };
+  // In LOCAL mode, always editable. In REMOTE mode, driven by session role (TODO).
+  const canEdit = connection === 'local' || connection === 'live';
+
+  return { state, setState, connection, canEdit, error, setError };
 }

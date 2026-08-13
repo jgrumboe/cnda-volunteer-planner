@@ -5,10 +5,11 @@ import { newId } from '../lib/importers';
 
 interface Props {
   state: PlanState;
+  canEdit: boolean;
   onChange: (tasks: Task[]) => void;
 }
 
-export function TasksView({ state, onChange }: Props) {
+export function TasksView({ state, canEdit, onChange }: Props) {
   const update = (id: string, patch: Partial<Task>) =>
     onChange(state.tasks.map((t) => (t.id === id ? { ...t, ...patch } : t)));
 
@@ -61,6 +62,7 @@ export function TasksView({ state, onChange }: Props) {
         </div>
       </div>
 
+      <fieldset disabled={!canEdit} style={{ border: 'none', padding: 0, margin: 0 }}>
       <table className="grid">
         <thead>
           <tr>
@@ -160,6 +162,7 @@ export function TasksView({ state, onChange }: Props) {
       <button className="btn" style={{ marginTop: 12 }} onClick={add}>
         + Add task
       </button>
+      </fieldset>
     </>
   );
 }
