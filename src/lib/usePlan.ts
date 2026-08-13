@@ -24,6 +24,10 @@ export interface UsePlanResult {
   connection: ConnectionState;
   /** True when the current user has write access (organizer or local mode). */
   canEdit: boolean;
+  /** The user's role from the memberships table (null in LOCAL mode). */
+  role: 'organizer' | 'volunteer' | null;
+  /** The person_id linked to this user in the memberships table. */
+  personId: string | null;
   error: string | null;
   setError: (err: string | null) => void;
 }
@@ -31,6 +35,8 @@ export interface UsePlanResult {
 export function usePlan(): UsePlanResult {
   const [state, setStateRaw] = useState<PlanState | null>(null);
   const [connection, setConnection] = useState<ConnectionState>('connecting');
+  const [role, setRole] = useState<'organizer' | 'volunteer' | null>(null);
+  const [personId, setPersonId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const backendRef = useRef<PlanBackend | null>(null);
@@ -60,6 +66,8 @@ export function usePlan(): UsePlanResult {
         setStateRaw(loaded);
         baselineRef.current = loaded;
         setConnection(backend.connection);
+        setRole(backend.role);
+        setPersonId(backend.personId);
       }).catch((err: Error) => {
         if (cancelled) return;
         if (err.message === 'not_a_member') {
@@ -161,13 +169,16 @@ export function usePlan(): UsePlanResult {
       replacePlan,
       connection: 'connecting',
       canEdit: false,
+      role: null,
+      personId: null,
       error: null,
       setError,
     };
   }
 
-  // In LOCAL mode, always editable. In REMOTE mode, driven by session role (TODO).
-  const canEdit = connection === 'local' || connection === 'live';
+  // In LOCAL mode (role=organizer), always editable.
+  // In REMOTE mode, only organizers can edit, and only when the connection is live.
+  const canEdit = role === 'organizer' && (connection === 'local' || connection === 'live');
 
-  return { state, setState, replacePlan, connection, canEdit, error, setError };
+  return { state, setState, replacePlan, connection, canEdit, role, personId, error, setError };
 }

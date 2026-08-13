@@ -20,6 +20,14 @@ export function createLocalBackend(): PlanBackend {
       return 'local';
     },
 
+    get role(): 'organizer' | 'volunteer' | null {
+      return 'organizer'; // LOCAL mode is always full access
+    },
+
+    get personId(): string | null {
+      return null;
+    },
+
     async load(): Promise<PlanState> {
       currentState = loadState() ?? createSeedState();
       return currentState;

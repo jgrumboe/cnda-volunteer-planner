@@ -185,6 +185,8 @@ export function createSupabaseBackend(): PlanBackend {
   function handleRealtimeEvent(payload: Record<string, unknown>) {
     if (!currentState || !subscriberCallback) return;
 
+    // Supabase realtime payload shape:
+    // { eventType: 'INSERT'|'UPDATE'|'DELETE', table: '...', new: {...}, old: {...} }
     const eventType = payload.eventType as string;
     const table = payload.table as string;
     const collection = tableToCollection(table);
@@ -193,13 +195,15 @@ export function createSupabaseBackend(): PlanBackend {
     let event: InboundEvent;
 
     if (eventType === 'DELETE') {
-      const old = payload.old as Record<string, unknown>;
+      const old = (payload.old ?? {}) as Record<string, unknown>;
       const id = realtimeRowId(collection, old);
+      if (!id) return; // Can't process without identity
       event = { collection, type: 'delete', id };
     } else {
       // INSERT or UPDATE
-      const row = payload.new as Record<string, unknown>;
+      const row = (payload.new ?? {}) as Record<string, unknown>;
       const id = realtimeRowId(collection, row);
+      if (!id) return;
       const domain = rowToDomain(collection, row);
       const timestamp = row.updated_at as string | undefined;
       event = {
@@ -238,6 +242,8 @@ export function createSupabaseBackend(): PlanBackend {
 
   return {
     get connection() { return connection; },
+    get role() { return meta?.role ?? null; },
+    get personId() { return meta?.personId ?? null; },
     load,
     push,
     replacePlan,

@@ -15,13 +15,15 @@ import { RulesPanel } from './components/RulesPanel';
 import { ConfirmButton } from './components/ConfirmButton';
 import { NowView } from './components/NowView';
 import { NotInvited } from './components/SignIn';
+import { MyShiftsView } from './components/MyShiftsView';
 import { usePlan } from './lib/usePlan';
 import { useAuth } from './lib/auth';
 import { getBackendMode } from './lib/backend/index';
 
-type Tab = 'now' | 'board' | 'people' | 'tasks' | 'balance';
+type Tab = 'mine' | 'now' | 'board' | 'people' | 'tasks' | 'balance';
 
 const TABS: { id: Tab; label: string }[] = [
+  { id: 'mine', label: 'My Shifts' },
   { id: 'now', label: 'Now' },
   { id: 'board', label: 'Board' },
   { id: 'people', label: 'People' },
@@ -30,9 +32,10 @@ const TABS: { id: Tab; label: string }[] = [
 ];
 
 export default function App() {
-  const { state, setState, replacePlan, canEdit, connection, error, setError } = usePlan();
+  const { state, setState, replacePlan, canEdit, connection, role, personId, error, setError } = usePlan();
   const auth = useAuth();
-  const [tab, setTab] = useState<Tab>('board');
+  // Volunteers land on "mine", organizers on "board"
+  const [tab, setTab] = useState<Tab>(role === 'volunteer' ? 'mine' : 'board');
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [showImport, setShowImport] = useState(false);
   const [showRules, setShowRules] = useState(false);
@@ -281,6 +284,7 @@ export default function App() {
       ) : null}
 
       <div className="content">
+        {tab === 'mine' ? <MyShiftsView state={state} personId={personId} /> : null}
         {tab === 'now' ? <NowView state={state} /> : null}
         {tab === 'board' ? (
           <BoardView

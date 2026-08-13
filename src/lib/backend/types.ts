@@ -50,6 +50,10 @@ export interface PlanBackend {
   /** Current connection state. */
   readonly connection: ConnectionState;
 
+  /** Role and personId after successful load (null before load or in LOCAL mode). */
+  readonly role: 'organizer' | 'volunteer' | null;
+  readonly personId: string | null;
+
   /**
    * Load the plan. Returns the initial state.
    * For LOCAL mode this reads localStorage; for REMOTE it calls get_plan.
