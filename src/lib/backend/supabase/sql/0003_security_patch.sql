@@ -1,163 +1,29 @@
--- CND Austria Volunteer Planner — Supabase schema
--- Apply via: Supabase Dashboard → SQL Editor → paste → Run
--- Then insert a plans row and your organizer membership manually.
+-- Security patch for an already-provisioned database (0001/0002 already applied).
+-- Apply via: Supabase Dashboard → SQL Editor → paste → Run.
+--
+-- Safe to re-run: every statement here is either `create or replace function`
+-- or an idempotent `revoke`/`grant`. It does not touch table definitions, so
+-- it can be applied without redoing 0001_init.sql.
+--
+-- Fixes:
+--   1. NULL-safe organizer checks in manage_membership / list_memberships.
+--      `role_in()` returns NULL for non-members, and `NULL != 'organizer'`
+--      evaluates to NULL (not TRUE) in SQL — so the old `!=` check silently
+--      let non-members through instead of raising. Combined with (2) below,
+--      this was an unauthenticated privilege-escalation / email-enumeration
+--      path. Now uses `is distinct from`, which is NULL-safe.
+--   2. Explicit revoke/grant on get_plan, replace_plan, manage_membership,
+--      list_memberships so they are only callable by `authenticated`, not
+--      the default `anon`/`public` grant Postgres gives new functions.
+--   3. Row-count / byte-size guards in replace_plan against oversized
+--      payloads (defense-in-depth; there was no limit before).
+--   4. get_plan redacts people.notes to organizers only (may hold private
+--      remarks about a volunteer). Note this covers only this RPC's read
+--      path — the people_read RLS policy and the realtime publication still
+--      expose the raw row to any member; see the comment inline.
 
-create extension if not exists pgcrypto;
-create extension if not exists citext;
+-- ---------------------------------------------------------------- get_plan
 
--- ---------------------------------------------------------------- tables
-
-create table plans (
-  id uuid primary key default gen_random_uuid(),
-  slug text not null unique,
-  event_name text not null default 'Cloud Native Days Austria',
-  rules jsonb not null default '{}'::jsonb,
-  revision bigint not null default 1,
-  updated_at timestamptz not null default now()
-);
-
--- The ONLY place an email exists. Deliberately NOT in the realtime publication.
-create table memberships (
-  plan_id uuid not null references plans(id) on delete cascade,
-  email citext not null,
-  role text not null check (role in ('organizer','volunteer')),
-  person_id text,
-  invited_at timestamptz not null default now(),
-  primary key (plan_id, email)
-);
-
-create table days (
-  plan_id uuid not null references plans(id) on delete cascade,
-  id text not null,
-  label text not null,
-  date date not null,
-  offered_to_volunteers boolean not null default true,
-  sort_order int not null default 0,
-  updated_at timestamptz not null default now(),
-  primary key (plan_id, id)
-);
-
-create table people (
-  plan_id uuid not null references plans(id) on delete cascade,
-  id text not null,
-  name text not null default '',
-  is_organizer boolean not null default false,
-  available_day_ids text[] not null default '{}',
-  multi_shift boolean not null default false,
-  max_shifts int,
-  tags text[] not null default '{}',
-  notes text,
-  updated_at timestamptz not null default now(),
-  primary key (plan_id, id)
-);
-
-create table tasks (
-  plan_id uuid not null references plans(id) on delete cascade,
-  id text not null,
-  day_id text not null,
-  start_min int not null check (start_min between 0 and 1440),
-  end_min   int not null check (end_min   between 0 and 1440),
-  title text not null default '',
-  category text not null,
-  needed int not null default 1 check (needed >= 0),
-  notes text,
-  updated_at timestamptz not null default now(),
-  primary key (plan_id, id)
-);
-
-create table assignments (
-  plan_id uuid not null references plans(id) on delete cascade,
-  task_id text not null,
-  person_id text not null,
-  pinned boolean not null default true,
-  source text not null default 'manual' check (source in ('manual','suggested','imported')),
-  updated_at timestamptz not null default now(),
-  primary key (plan_id, task_id, person_id),
-  foreign key (plan_id, task_id)   references tasks(plan_id, id)  on delete cascade,
-  foreign key (plan_id, person_id) references people(plan_id, id) on delete cascade
-);
-
--- ---------------------------------------------------------------- updated_at trigger
-
-create or replace function touch_updated_at()
-returns trigger language plpgsql as $$
-begin
-  new.updated_at = now();
-  return new;
-end;
-$$;
-
-create trigger plans_updated_at       before update on plans       for each row execute function touch_updated_at();
-create trigger days_updated_at        before update on days        for each row execute function touch_updated_at();
-create trigger people_updated_at      before update on people      for each row execute function touch_updated_at();
-create trigger tasks_updated_at       before update on tasks       for each row execute function touch_updated_at();
-create trigger assignments_updated_at before update on assignments for each row execute function touch_updated_at();
-
--- ---------------------------------------------------------------- RLS helper
-
-create or replace function role_in(p_plan_id uuid) returns text
-language sql stable security definer set search_path = public as $$
-  select m.role from memberships m
-   where m.plan_id = p_plan_id
-     and m.email = (auth.jwt() ->> 'email')::citext
-   limit 1
-$$;
-
-revoke execute on function role_in(uuid) from public, anon;
-grant  execute on function role_in(uuid) to authenticated;
-
--- ---------------------------------------------------------------- RLS policies
-
-alter table plans enable row level security;
-alter table memberships enable row level security;
-alter table days enable row level security;
-alter table people enable row level security;
-alter table tasks enable row level security;
-alter table assignments enable row level security;
-
--- plans: readable by members, writable by organizers
-create policy plans_read  on plans for select to authenticated
-  using (role_in(id) is not null);
-create policy plans_write on plans for all to authenticated
-  using (role_in(id) = 'organizer') with check (role_in(id) = 'organizer');
-
--- memberships: self-read only (so the client learns its role and person_id)
-create policy memberships_self on memberships for select to authenticated
-  using (email = (auth.jwt() ->> 'email')::citext);
-
--- days
-create policy days_read  on days for select to authenticated
-  using (role_in(plan_id) is not null);
-create policy days_write on days for all to authenticated
-  using (role_in(plan_id) = 'organizer') with check (role_in(plan_id) = 'organizer');
-
--- people
-create policy people_read  on people for select to authenticated
-  using (role_in(plan_id) is not null);
-create policy people_write on people for all to authenticated
-  using (role_in(plan_id) = 'organizer') with check (role_in(plan_id) = 'organizer');
-
--- tasks
-create policy tasks_read  on tasks for select to authenticated
-  using (role_in(plan_id) is not null);
-create policy tasks_write on tasks for all to authenticated
-  using (role_in(plan_id) = 'organizer') with check (role_in(plan_id) = 'organizer');
-
--- assignments
-create policy assignments_read  on assignments for select to authenticated
-  using (role_in(plan_id) is not null);
-create policy assignments_write on assignments for all to authenticated
-  using (role_in(plan_id) = 'organizer') with check (role_in(plan_id) = 'organizer');
-
--- ---------------------------------------------------------------- realtime publication
-
--- memberships deliberately excluded: it holds email addresses and
--- DELETE payloads bypass RLS on the old_record.
-alter publication supabase_realtime add table plans, days, people, tasks, assignments;
-
--- ---------------------------------------------------------------- RPCs
-
--- get_plan: single consistent read of the full plan state
 create or replace function get_plan(p_slug text)
 returns jsonb
 language plpgsql stable security invoker as $$
@@ -247,7 +113,8 @@ $$;
 revoke execute on function get_plan(text) from public, anon;
 grant  execute on function get_plan(text) to authenticated;
 
--- replace_plan: atomic full-plan replacement (import, reset)
+-- ---------------------------------------------------------------- replace_plan
+
 create or replace function replace_plan(p_plan_id uuid, payload jsonb)
 returns bigint
 language plpgsql security invoker as $$
@@ -411,9 +278,8 @@ $$;
 revoke execute on function replace_plan(uuid, jsonb) from public, anon;
 grant  execute on function replace_plan(uuid, jsonb) to authenticated;
 
--- ---------------------------------------------------------------- membership management RPC
+-- ---------------------------------------------------------------- manage_membership
 
--- Organizer-only: manage memberships without exposing the table to broad policies.
 create or replace function manage_membership(
   p_plan_id uuid,
   p_action text,        -- 'add', 'update', 'remove'
@@ -469,3 +335,27 @@ $$;
 
 revoke execute on function manage_membership(uuid, text, citext, text, text) from public, anon;
 grant  execute on function manage_membership(uuid, text, citext, text, text) to authenticated;
+
+-- ---------------------------------------------------------------- list_memberships
+
+create or replace function list_memberships(p_plan_id uuid)
+returns table (email citext, role text, person_id text)
+language plpgsql stable security definer set search_path = public as $$
+begin
+  -- Only organizers may see the full list. NULL-safe: role_in() returns NULL
+  -- for non-members, and `NULL != 'organizer'` is NULL (not TRUE) in SQL, so a
+  -- plain != here would silently let non-members through.
+  if role_in(p_plan_id) is distinct from 'organizer' then
+    raise exception 'permission denied' using errcode = '42501';
+  end if;
+
+  return query
+    select m.email, m.role, m.person_id
+      from memberships m
+     where m.plan_id = p_plan_id
+     order by m.role, m.email;
+end;
+$$;
+
+revoke execute on function list_memberships(uuid) from public, anon;
+grant  execute on function list_memberships(uuid) to authenticated;
