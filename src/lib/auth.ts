@@ -7,10 +7,15 @@
 
 import { createContext, useContext } from 'react';
 
+/**
+ * Only the email is known at the auth layer. Role and personId are
+ * plan-specific membership facts, not auth facts — they come from the
+ * get_plan RPC (see usePlan) and must never be assumed here. A prior
+ * version hardcoded role: 'organizer' for every signed-in user; nothing
+ * read it, but it was a footgun waiting for a future consumer.
+ */
 export interface SessionInfo {
   email: string;
-  role: 'organizer' | 'volunteer';
-  personId: string | null;
 }
 
 export interface AuthState {

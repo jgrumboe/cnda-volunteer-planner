@@ -22,7 +22,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Check existing session
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       if (s?.user?.email) {
-        setSession({ email: s.user.email, role: 'organizer', personId: null });
+        setSession({ email: s.user.email });
       } else {
         setSession(null);
       }
@@ -32,7 +32,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
       if (s?.user?.email) {
-        setSession({ email: s.user.email, role: 'organizer', personId: null });
+        setSession({ email: s.user.email });
       } else {
         setSession(null);
       }
@@ -55,6 +55,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { error: e } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
+        // `hd` only preselects/hints the Workspace domain on Google's consent
+        // screen — it does not restrict which accounts can complete sign-in
+        // (any Google account can still authenticate). The real authorization
+        // boundary is the memberships table: get_plan returns `not_a_member`
+        // for anyone without a row there, regardless of email domain. A hard
+        // domain restriction at sign-in would need a Supabase Auth Hook
+        // configured on the project itself (outside this repo).
         queryParams: { hd: 'cloud-native.at' },
         redirectTo: window.location.origin + window.location.pathname,
       },

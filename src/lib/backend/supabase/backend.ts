@@ -77,6 +77,13 @@ export function createSupabaseBackend(): PlanBackend {
       setConnection('error');
       throw new Error('not_a_member');
     }
+    // planId is interpolated unescaped into the realtime filter string below
+    // (`plan_id=eq.${meta.planId}`). It's server-issued today, but validating
+    // its shape here means that stays true even if this ever changes.
+    if (typeof data.planId !== 'string' || !UUID_RE.test(data.planId)) {
+      setConnection('error');
+      throw new Error('get_plan returned an invalid planId.');
+    }
 
     meta = {
       planId: data.planId,
@@ -254,6 +261,8 @@ export function createSupabaseBackend(): PlanBackend {
 }
 
 // ---------------------------------------------------------------- helpers
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function pkColumns(collection: string): string {
   switch (collection) {

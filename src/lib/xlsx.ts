@@ -236,7 +236,14 @@ export function toCsv(rows: (string | number)[][]): string {
     .map((r) =>
       r
         .map((cell) => {
-          const s = String(cell ?? '');
+          let s = String(cell ?? '');
+          // Neutralize CSV/formula injection: a value starting with = + - @
+          // (or tab/CR) is read as a formula by Excel/Sheets on open. Only
+          // applies to string cells — numeric cells here are always computed
+          // values (counts, hours), never user-controlled text.
+          if (typeof cell === 'string' && /^[=+\-@\t\r]/.test(s)) {
+            s = `'${s}`;
+          }
           return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
         })
         .join(','),
