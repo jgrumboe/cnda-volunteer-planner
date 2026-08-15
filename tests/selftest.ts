@@ -73,7 +73,7 @@ eq(parseCsv('a\n"he said ""hi"""')[1][0], 'he said "hi"', 'csv escaped quotes');
 
 const merged = mergePeople(
   [{ id: 'a', name: 'Volunteer 04', isOrganizer: false, availableDayIds: ['tue'], multiShift: false, maxShifts: null, tags: [] }],
-  [{ id: 'b', name: 'mario  schober', isOrganizer: false, availableDayIds: ['wed'], multiShift: false, maxShifts: null, tags: [] }],
+  [{ id: 'b', name: 'volunteer  04', isOrganizer: false, availableDayIds: ['wed'], multiShift: false, maxShifts: null, tags: [] }],
 );
 eq(merged.added, 0, 'fuzzy name match does not duplicate');
 eq(merged.updated, 1, 'existing person updated');

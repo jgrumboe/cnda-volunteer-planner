@@ -183,6 +183,6 @@ tests/selftest.ts       Headless checks for the core
 
 Ships with CND Austria 2026 pre-loaded: 3 days (28–30 September), the 30-task template from
 the spreadsheet, the 8 organizers from
-[cloudnativedays.at/team](https://cloudnativedays.at/team), and the volunteers from the
-registration responses. **Reset** returns to this. Organizer day-availability is a guess —
-check it in **People**.
+[cloudnativedays.at/team](https://cloudnativedays.at/team), and synthetic volunteer placeholders
+that preserve the original availability/preferences mix. **Reset** returns to this. Organizer
+day-availability is a guess — check it in **People**.
