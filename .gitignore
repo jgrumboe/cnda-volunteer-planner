@@ -23,6 +23,3 @@ dist-ssr
 *.sln
 *.sw?
 .selftest/
-
-# Recorded promo (regenerate with: npm run promo)
-promo.mp4

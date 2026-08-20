@@ -22,25 +22,6 @@ nvm use && npm install && npm run dev
 | `npm run typecheck` | `tsc` with no emit |
 | `npm run selftest` | Headless checks for the scheduling core (50 assertions) |
 | `npm run lint` | oxlint |
-| `npm run promo` | Records `promo.mp4`, a ~70s walkthrough of the core features |
-
-### Recording the promo
-
-`npm run promo` needs the dev server already running, plus Chrome and `ffmpeg` on PATH. It
-drives headless Chrome over the DevTools Protocol — no Puppeteer or Playwright; Node 24's
-global `WebSocket` is enough — captures JPEG frames, and encodes them with ffmpeg at the
-real elapsed frame timings, so UI transitions come out as genuine motion.
-
-It runs in a **throwaway Chrome profile**, so recording never touches your own browser or
-the plan stored in it. Volunteer names are replaced with invented ones and the import scene
-uses a synthetic CSV: the video is shareable without exposing the real roster.
-
-`promo.mp4` is gitignored — regenerate it rather than committing 3.7 MB of binary.
-
-Note: the script clears local storage and relies on the app's own seed to repopulate a demo
-schedule before renaming volunteers. Now that the seed is blank (see below), `scripts/promo.mjs`
-needs its own demo fixture (e.g. driving **Import** with a small CSV) before it produces a
-populated recording again — currently it will record an empty plan.
 
 ## Where the data lives
 

@@ -9,7 +9,6 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
-    "promo": "node scripts/promo.mjs",
     "selftest": "tsc tests/selftest.ts --ignoreConfig --outDir .selftest --module commonjs --moduleResolution node --target es2022 --esModuleInterop --skipLibCheck --strict --ignoreDeprecations 6.0 --types node && echo '{\"type\":\"commonjs\"}' > .selftest/package.json && node .selftest/tests/selftest.js"
   },
   "dependencies": {
