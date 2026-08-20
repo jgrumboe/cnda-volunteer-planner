@@ -33,10 +33,14 @@ real elapsed frame timings, so UI transitions come out as genuine motion.
 
 It runs in a **throwaway Chrome profile**, so recording never touches your own browser or
 the plan stored in it. Volunteer names are replaced with invented ones and the import scene
-uses a synthetic CSV: the video is shareable without exposing the real roster. Organizers
-are kept, since they're already listed publicly on cloudnativedays.at/team.
+uses a synthetic CSV: the video is shareable without exposing the real roster.
 
 `promo.mp4` is gitignored — regenerate it rather than committing 3.7 MB of binary.
+
+Note: the script clears local storage and relies on the app's own seed to repopulate a demo
+schedule before renaming volunteers. Now that the seed is blank (see below), `scripts/promo.mjs`
+needs its own demo fixture (e.g. driving **Import** with a small CSV) before it produces a
+populated recording again — currently it will record an empty plan.
 
 ## Where the data lives
 
@@ -172,7 +176,7 @@ src/
     xlsx.ts             Dependency-free XLSX + CSV reading, CSV writing
     importers.ts        Sheet -> domain mapping, PII filtering, name merging
     exporters.ts        CSV / JSON output
-    seed.ts             CND Austria 2026 starting data
+    seed.ts             Blank starting state (no pre-loaded people/schedule)
     storage.ts          localStorage persistence
     rng.ts              Seeded PRNG for reproducible suggestions
   components/           Board, People, Tasks, Warnings & Balance, dialogs
@@ -181,8 +185,7 @@ tests/selftest.ts       Headless checks for the core
 
 ## Seed data
 
-Ships with CND Austria 2026 pre-loaded: 3 days (28–30 September), the 30-task template from
-the spreadsheet, the 8 organizers from
-[cloudnativedays.at/team](https://cloudnativedays.at/team), and synthetic volunteer placeholders
-that preserve the original availability/preferences mix. **Reset** returns to this. Organizer
-day-availability is a guess — check it in **People**.
+There isn't any. **Reset** returns to a blank plan (no days, tasks, or people) — bring your own
+schedule via **Import**, or add days/tasks/people by hand. The self-test suite has its own
+synthetic fixture (`tests/fixtures.ts`) with a realistic mix of days/tasks/people to exercise the
+scheduling algorithms; it's never imported by app code.

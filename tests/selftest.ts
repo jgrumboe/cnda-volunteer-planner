@@ -5,7 +5,7 @@
 
 import { proposeAssignments, candidatesForTask } from '../src/lib/assign';
 import { computeLoads, findConflicts, totalOpenSlots, withPrunedAssignments } from '../src/lib/plan';
-import { createSeedState } from '../src/lib/seed';
+import { createFixtureState, DAYS } from './fixtures';
 import { overlaps, parseTimeRange } from '../src/lib/time';
 import { parseCsv } from '../src/lib/xlsx';
 import { inferCategory, matchDayIds, mergePeople, newId } from '../src/lib/importers';
@@ -13,7 +13,6 @@ import { nowInEventTz, eventPhase, runningNow, upNext } from '../src/lib/clock';
 import { diffById, shallowRowEqual, assignmentKey, diffAll } from '../src/lib/backend/diff';
 import { mergeInbound } from '../src/lib/backend/merge';
 import { createRowSync } from '../src/lib/backend/rowsync';
-import { DAYS } from '../src/lib/seed';
 import type { PlanState } from '../src/types';
 
 let failures = 0;
@@ -100,7 +99,7 @@ section('id generation');
 // ------------------------------------------------------- cascade on delete
 section('cascade on delete');
 {
-  const base = createSeedState();
+  const base = createFixtureState();
   const person = base.people[0];
   const task = base.tasks.find((t) => t.dayId === 'mon')!;
   const other = base.tasks.find((t) => t.dayId === 'wed' && t.needed > 2)!;
@@ -154,9 +153,9 @@ section('cascade on delete');
   eq(taskGone.assignments.length, 1, 'deleting a task cascades to its assignments');
 }
 
-// ---------------------------------------------------------------- seed
-section('seed data');
-const seed = createSeedState();
+// ---------------------------------------------------------------- fixture
+section('fixture data');
+const seed = createFixtureState();
 eq(seed.tasks.length, 30, 'task count');
 eq(seed.people.length, 18, 'people count (8 organizers + 10 volunteers)');
 eq(seed.people.filter((p) => p.isOrganizer).length, 8, 'organizer count');
@@ -293,7 +292,7 @@ section('clock: nowInEventTz');
 section('clock: eventPhase');
 {
   // Event days: Mon 2026-09-28, Tue 2026-09-29, Wed 2026-09-30
-  const s = createSeedState();
+  const s = createFixtureState();
   eq(eventPhase(s, { date: '2026-09-27', minutes: 600 }), 'before', 'day before event');
   eq(eventPhase(s, { date: '2026-09-28', minutes: 600 }), 'during', 'first event day');
   eq(eventPhase(s, { date: '2026-09-29', minutes: 600 }), 'during', 'middle event day');
@@ -303,7 +302,7 @@ section('clock: eventPhase');
 
 section('clock: runningNow');
 {
-  const s = createSeedState();
+  const s = createFixtureState();
   // "Setup afternoon" on Monday: 13:00-18:00 (780-1080).
   // At 14:00 (840 min) it should be running.
   const running = runningNow(s, { date: '2026-09-28', minutes: 840 });
@@ -325,7 +324,7 @@ section('clock: runningNow');
 
 section('clock: upNext');
 {
-  const s = createSeedState();
+  const s = createFixtureState();
   // At 11:30 (690 min) on Monday, "Deliveries" (12:00=720) and "Setup" (13:00=780) are next.
   const next = upNext(s, { date: '2026-09-28', minutes: 690 });
   ok(next.length > 0, 'has upcoming tasks');
@@ -343,7 +342,7 @@ section('clock: upNext');
 
 section('clock: personId filter');
 {
-  const s = createSeedState();
+  const s = createFixtureState();
   const person = s.people[0]; // first organizer
   const task = s.tasks.find((t) => t.dayId === 'mon' && t.title === 'Setup afternoon')!;
   const withA: PlanState = {
@@ -403,7 +402,7 @@ section('diff: diffById');
 
 section('diff: diffAll');
 {
-  const s = createSeedState();
+  const s = createFixtureState();
   // Unchanged state produces zero ops.
   const ops = diffAll(
     { days: s.days, people: s.people, tasks: s.tasks, assignments: s.assignments },
@@ -431,7 +430,7 @@ section('diff: assignmentKey');
 // ---------------------------------------------------------------- merge
 section('merge: identity preservation');
 {
-  const s = createSeedState();
+  const s = createFixtureState();
 
   // Upsert that equals local row → same state reference
   const person = s.people[0];
@@ -478,7 +477,7 @@ section('merge: identity preservation');
 
 section('merge: pending shield (upserts blocked, deletes pass)');
 {
-  const s = createSeedState();
+  const s = createFixtureState();
   const person = s.people[0];
 
   // Upsert blocked by pending
@@ -502,7 +501,7 @@ section('merge: pending shield (upserts blocked, deletes pass)');
 
 section('merge: stale event dropped');
 {
-  const s = createSeedState();
+  const s = createFixtureState();
   const person = s.people[0];
   const clocks = {
     days: new Map(),
