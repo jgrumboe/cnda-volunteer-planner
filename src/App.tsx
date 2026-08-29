@@ -86,7 +86,6 @@ export default function App() {
     for (const a of assignments) counts.set(a.taskId, (counts.get(a.taskId) ?? 0) + 1);
     return new Set(tasks.filter((t) => (counts.get(t.id) ?? 0) < t.needed).map((t) => t.id));
   }, [assignments, tasks]);
-  const canManageAccess = role === 'organizer';
 
   const assign = useCallback((taskId: string, personId: string) => {
     setState((s) =>
@@ -260,11 +259,9 @@ export default function App() {
             </div>
 
             {/* Access button — visible on mobile, hidden on desktop (desktop shows it in actions-secondary) */}
-            {canManageAccess ? (
-              <div className="actions-access">
-                <button className="btn" onClick={() => setShowAccess(true)}>Access</button>
-              </div>
-            ) : null}
+            <div className="actions-access">
+              <button className="btn" onClick={() => setShowAccess(true)}>Access</button>
+            </div>
 
             {/* Overflow menu for secondary actions */}
             <div className="overflow-menu" ref={overflowRef}>
@@ -285,9 +282,6 @@ export default function App() {
                     <button role="menuitem" className="btn ghost" onClick={clearSuggestions}>
                       Clear {suggestedCount} suggested
                     </button>
-                  ) : null}
-                  {canManageAccess ? (
-                    <button role="menuitem" className="btn" onClick={() => setShowAccess(true)}>Access</button>
                   ) : null}
                   <button role="menuitem" className="btn" onClick={() => setShowRules(true)}>Rules</button>
                   <button role="menuitem" className="btn" onClick={() => setShowImport(true)}>Import</button>
@@ -312,9 +306,7 @@ export default function App() {
             {/* Desktop-only secondary actions */}
             <div className="actions actions-secondary">
               <button className="btn" onClick={() => setShowRules(true)}>Rules</button>
-              {canManageAccess ? (
-                <button className="btn" onClick={() => setShowAccess(true)}>Access</button>
-              ) : null}
+              <button className="btn" onClick={() => setShowAccess(true)}>Access</button>
               <button className="btn" onClick={() => setShowImport(true)}>Import</button>
               <button className="btn" onClick={() => exportTasksCsv(state)} title="Tasks with assigned people, as CSV">Export tasks</button>
               <button className="btn" onClick={() => exportPeopleCsv(state)} title="Per-person schedule, as CSV">Export people</button>
@@ -335,9 +327,6 @@ export default function App() {
         ) : (
           <>
             <div className="actions actions-secondary">
-              {canManageAccess ? (
-                <button className="btn" onClick={() => setShowAccess(true)}>Access</button>
-              ) : null}
               <button className="btn" onClick={() => exportTasksCsv(state)} title="Tasks with assigned people, as CSV">Export tasks</button>
               <button className="btn" onClick={() => exportPeopleCsv(state)} title="Per-person schedule, as CSV">Export people</button>
               {getBackendMode() === 'remote' ? (
@@ -355,9 +344,6 @@ export default function App() {
               </button>
               {showOverflow ? (
                 <div className="overflow-dropdown" role="menu" onClick={() => setShowOverflow(false)}>
-                  {canManageAccess ? (
-                    <button role="menuitem" className="btn" onClick={() => setShowAccess(true)}>Access</button>
-                  ) : null}
                   <button role="menuitem" className="btn" onClick={() => exportTasksCsv(state)}>Export tasks</button>
                   <button role="menuitem" className="btn" onClick={() => exportPeopleCsv(state)}>Export people</button>
                   {getBackendMode() === 'remote' ? (
