@@ -375,3 +375,101 @@ fieldset:disabled textarea {
 fieldset:disabled button {
   display: none;
 }
+
+/* ---------------------------------------------------------------- overflow menu */
+/* Hidden by default on desktop; shown only on mobile via the media query below */
+.overflow-menu { position: relative; display: none; }
+.overflow-trigger { font-size: 18px; padding: 4px 10px; line-height: 1; }
+.overflow-dropdown {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 100;
+  background: var(--panel); border: 1px solid var(--border-strong);
+  border-radius: var(--radius); box-shadow: 0 8px 24px rgba(0,0,0,.5);
+  display: flex; flex-direction: column; gap: 4px; padding: 8px;
+  min-width: 180px;
+}
+.overflow-dropdown .btn { width: 100%; text-align: left; }
+
+/* Primary action buttons visible on desktop; hidden on mobile */
+.actions-primary { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+/* Secondary action bar shown on desktop, hidden on mobile */
+.actions-secondary { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+/* The "assign open tasks" button inside overflow is hidden on desktop */
+.overflow-assign { display: none; }
+
+/* ---------------------------------------------------------------- mobile board */
+.board-mobile { display: flex; flex-direction: column; gap: 0; }
+
+.mobile-day-nav {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 0 4px; margin-bottom: 4px;
+}
+.mobile-nav-arrow { font-size: 18px; padding: 6px 12px; flex-shrink: 0; }
+.mobile-day-label {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;
+}
+.mobile-day-name { font-size: 16px; font-weight: 700; }
+.mobile-day-date { font-size: 12px; color: var(--faint); }
+
+.mobile-day-dots {
+  display: flex; gap: 6px; justify-content: center; margin-bottom: 12px;
+}
+.mobile-day-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--border-strong); border: 0; padding: 0; cursor: pointer;
+}
+.mobile-day-dot.active { background: var(--accent); }
+
+/* ---------------------------------------------------------------- responsive — ≤ 640 px */
+@media (max-width: 640px) {
+  /* topbar: stack brand + tabs; hide secondary actions; show overflow trigger */
+  .topbar {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 12px;
+  }
+  .brand-subtitle { display: none; }
+  .spacer { display: none; }
+
+  .tabs {
+    order: 2; width: 100%;
+    overflow-x: auto; -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+
+  /* Warn chip moves to its own row */
+  .warn-chip.topbar-chip { order: 3; }
+
+  /* Hide desktop secondary actions; show overflow trigger */
+  .actions-secondary { display: none; }
+  .overflow-menu { display: block; }
+
+  /* On mobile, the primary "Assign open tasks" button is inside overflow too */
+  .actions-primary { display: none; }
+  .overflow-assign { display: block; }
+
+  /* Full-width content, less padding */
+  .content { padding: 10px; }
+
+  /* now-view fills width */
+  .now-view { max-width: 100%; }
+
+  /* now-cards: full width */
+  .now-cards { gap: 6px; }
+  .now-card { padding: 10px 12px; }
+
+  /* balance bars: narrower name column */
+  .bar-row { grid-template-columns: 120px 1fr 70px; }
+
+  /* organizer-only table views: scroll horizontally */
+  table.grid {
+    display: block; overflow-x: auto; -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+  }
+
+  /* modal: full width on mobile */
+  .backdrop { padding: 12px; align-items: flex-end; }
+  .modal { border-radius: 10px 10px 0 0; max-height: 85vh; }
+}
