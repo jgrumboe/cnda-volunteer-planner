@@ -258,6 +258,11 @@ export default function App() {
               ) : null}
             </div>
 
+            {/* Access button — visible on mobile, hidden on desktop (desktop shows it in actions-secondary) */}
+            <div className="actions-access">
+              <button className="btn" onClick={() => setShowAccess(true)}>Access</button>
+            </div>
+
             {/* Overflow menu for secondary actions */}
             <div className="overflow-menu" ref={overflowRef}>
               <button

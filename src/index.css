@@ -398,6 +398,9 @@ fieldset:disabled button {
 /* The "assign open tasks" button inside overflow is hidden on desktop */
 .overflow-assign { display: none; }
 
+/* Access button shown on mobile for organizers; hidden on desktop (already in actions-secondary) */
+.actions-access { display: none; }
+
 /* ---------------------------------------------------------------- mobile board */
 .board-mobile { display: flex; flex-direction: column; gap: 0; }
 
@@ -449,6 +452,9 @@ fieldset:disabled button {
   /* On mobile, the primary "Assign open tasks" button is inside overflow too */
   .actions-primary { display: none; }
   .overflow-assign { display: block; }
+
+  /* Show the Access button directly on mobile (organizers only) */
+  .actions-access { display: flex; }
 
   /* Full-width content, less padding */
   .content { padding: 10px; }
