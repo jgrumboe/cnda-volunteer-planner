@@ -258,6 +258,11 @@ export default function App() {
               ) : null}
             </div>
 
+            {/* Access button — visible on mobile, hidden on desktop (desktop shows it in actions-secondary) */}
+            <div className="actions-access">
+              <button className="btn" onClick={() => setShowAccess(true)}>Access</button>
+            </div>
+
             {/* Overflow menu for secondary actions */}
             <div className="overflow-menu" ref={overflowRef}>
               <button
@@ -279,7 +284,6 @@ export default function App() {
                     </button>
                   ) : null}
                   <button role="menuitem" className="btn" onClick={() => setShowRules(true)}>Rules</button>
-                  <button role="menuitem" className="btn" onClick={() => setShowAccess(true)}>Access</button>
                   <button role="menuitem" className="btn" onClick={() => setShowImport(true)}>Import</button>
                   <button role="menuitem" className="btn" onClick={() => exportTasksCsv(state)}>Export tasks</button>
                   <button role="menuitem" className="btn" onClick={() => exportPeopleCsv(state)}>Export people</button>
