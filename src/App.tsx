@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Assignment, Person, Rules, Task } from './types';
 import { findConflicts, totalOpenSlots, withPrunedAssignments, type Conflict } from './lib/plan';
 import { proposeAssignments, type Proposal } from './lib/assign';
@@ -42,6 +42,20 @@ export default function App() {
   const [showRules, setShowRules] = useState(false);
   const [showAccess, setShowAccess] = useState(false);
   const [thinking, setThinking] = useState(false);
+  const [showOverflow, setShowOverflow] = useState(false);
+  const overflowRef = useRef<HTMLDivElement>(null);
+
+  // Close overflow dropdown on outside click.
+  useEffect(() => {
+    if (!showOverflow) return;
+    const handler = (e: MouseEvent) => {
+      if (overflowRef.current && !overflowRef.current.contains(e.target as Node)) {
+        setShowOverflow(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showOverflow]);
 
   const { days, people, tasks, assignments, rules } = state;
 
@@ -202,7 +216,7 @@ export default function App() {
       <div className="topbar">
         <div className="brand">
           <strong>{state.eventName}</strong>
-          <span>Volunteer &amp; task planner · {getBackendMode() === 'local' ? 'data stays in this browser' : 'live · shared with your team'}</span>
+          <span className="brand-subtitle">{getBackendMode() === 'local' ? 'data stays in this browser' : 'live · shared with your team'}</span>
         </div>
 
         <nav className="tabs">
@@ -231,61 +245,110 @@ export default function App() {
         <div className="spacer" />
 
         {canEdit ? (
-          <div className="actions">
-            <button className="btn primary" onClick={() => suggest()} disabled={thinking || openSlots === 0}>
-              {thinking ? 'Searching…' : 'Assign open tasks'}
-            </button>
-            {suggestedCount > 0 ? (
-              <button className="btn ghost" onClick={clearSuggestions} title="Remove all unpinned suggestions">
-                Clear {suggestedCount} suggested
+          <>
+            {/* Primary actions visible on desktop */}
+            <div className="actions actions-primary">
+              <button className="btn primary" onClick={() => suggest()} disabled={thinking || openSlots === 0}>
+                {thinking ? 'Searching…' : 'Assign open tasks'}
               </button>
-            ) : null}
-            <button className="btn" onClick={() => setShowRules(true)}>
-              Rules
-            </button>
-            <button className="btn" onClick={() => setShowAccess(true)}>
-              Access
-            </button>
-            <button className="btn" onClick={() => setShowImport(true)}>
-              Import
-            </button>
-            <button className="btn" onClick={() => exportTasksCsv(state)} title="Tasks with assigned people, as CSV">
-              Export tasks
-            </button>
-            <button className="btn" onClick={() => exportPeopleCsv(state)} title="Per-person schedule, as CSV">
-              Export people
-            </button>
-            <button className="btn ghost" onClick={() => exportJson(state)} title="Full backup you can re-import">
-              Backup
-            </button>
-            <ConfirmButton
-              className="btn ghost danger"
-              label="Reset"
-              question="Discard this plan and start from the seed data?"
-              confirmLabel="Yes, reset"
-              danger
-              onConfirm={resetAll}
-            />
-            {getBackendMode() === 'remote' ? (
-              <button className="btn ghost" onClick={auth.signOut} title="Sign out">
-                Sign out
+              {suggestedCount > 0 ? (
+                <button className="btn ghost" onClick={clearSuggestions} title="Remove all unpinned suggestions">
+                  Clear {suggestedCount} suggested
+                </button>
+              ) : null}
+            </div>
+
+            {/* Overflow menu for secondary actions */}
+            <div className="overflow-menu" ref={overflowRef}>
+              <button
+                className="btn ghost overflow-trigger"
+                onClick={() => setShowOverflow((v) => !v)}
+                aria-label="More actions"
+                aria-expanded={showOverflow}
+              >
+                ⋮
               </button>
-            ) : null}
-          </div>
+              {showOverflow ? (
+                <div className="overflow-dropdown" role="menu" onClick={() => setShowOverflow(false)}>
+                  <button role="menuitem" className="btn primary overflow-assign" onClick={() => suggest()} disabled={thinking || openSlots === 0}>
+                    {thinking ? 'Searching…' : 'Assign open tasks'}
+                  </button>
+                  {suggestedCount > 0 ? (
+                    <button role="menuitem" className="btn ghost" onClick={clearSuggestions}>
+                      Clear {suggestedCount} suggested
+                    </button>
+                  ) : null}
+                  <button role="menuitem" className="btn" onClick={() => setShowRules(true)}>Rules</button>
+                  <button role="menuitem" className="btn" onClick={() => setShowAccess(true)}>Access</button>
+                  <button role="menuitem" className="btn" onClick={() => setShowImport(true)}>Import</button>
+                  <button role="menuitem" className="btn" onClick={() => exportTasksCsv(state)}>Export tasks</button>
+                  <button role="menuitem" className="btn" onClick={() => exportPeopleCsv(state)}>Export people</button>
+                  <button role="menuitem" className="btn ghost" onClick={() => exportJson(state)}>Backup</button>
+                  <ConfirmButton
+                    className="btn ghost danger"
+                    label="Reset"
+                    question="Discard this plan and start from the seed data?"
+                    confirmLabel="Yes, reset"
+                    danger
+                    onConfirm={resetAll}
+                  />
+                  {getBackendMode() === 'remote' ? (
+                    <button role="menuitem" className="btn ghost" onClick={auth.signOut}>Sign out</button>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+
+            {/* Desktop-only secondary actions */}
+            <div className="actions actions-secondary">
+              <button className="btn" onClick={() => setShowRules(true)}>Rules</button>
+              <button className="btn" onClick={() => setShowAccess(true)}>Access</button>
+              <button className="btn" onClick={() => setShowImport(true)}>Import</button>
+              <button className="btn" onClick={() => exportTasksCsv(state)} title="Tasks with assigned people, as CSV">Export tasks</button>
+              <button className="btn" onClick={() => exportPeopleCsv(state)} title="Per-person schedule, as CSV">Export people</button>
+              <button className="btn ghost" onClick={() => exportJson(state)} title="Full backup you can re-import">Backup</button>
+              <ConfirmButton
+                className="btn ghost danger"
+                label="Reset"
+                question="Discard this plan and start from the seed data?"
+                confirmLabel="Yes, reset"
+                danger
+                onConfirm={resetAll}
+              />
+              {getBackendMode() === 'remote' ? (
+                <button className="btn ghost" onClick={auth.signOut} title="Sign out">Sign out</button>
+              ) : null}
+            </div>
+          </>
         ) : (
-          <div className="actions">
-            <button className="btn" onClick={() => exportTasksCsv(state)} title="Tasks with assigned people, as CSV">
-              Export tasks
-            </button>
-            <button className="btn" onClick={() => exportPeopleCsv(state)} title="Per-person schedule, as CSV">
-              Export people
-            </button>
-            {getBackendMode() === 'remote' ? (
-              <button className="btn ghost" onClick={auth.signOut} title="Sign out">
-                Sign out
+          <>
+            <div className="actions actions-secondary">
+              <button className="btn" onClick={() => exportTasksCsv(state)} title="Tasks with assigned people, as CSV">Export tasks</button>
+              <button className="btn" onClick={() => exportPeopleCsv(state)} title="Per-person schedule, as CSV">Export people</button>
+              {getBackendMode() === 'remote' ? (
+                <button className="btn ghost" onClick={auth.signOut} title="Sign out">Sign out</button>
+              ) : null}
+            </div>
+            <div className="overflow-menu" ref={overflowRef}>
+              <button
+                className="btn ghost overflow-trigger"
+                onClick={() => setShowOverflow((v) => !v)}
+                aria-label="More actions"
+                aria-expanded={showOverflow}
+              >
+                ⋮
               </button>
-            ) : null}
-          </div>
+              {showOverflow ? (
+                <div className="overflow-dropdown" role="menu" onClick={() => setShowOverflow(false)}>
+                  <button role="menuitem" className="btn" onClick={() => exportTasksCsv(state)}>Export tasks</button>
+                  <button role="menuitem" className="btn" onClick={() => exportPeopleCsv(state)}>Export people</button>
+                  {getBackendMode() === 'remote' ? (
+                    <button role="menuitem" className="btn ghost" onClick={auth.signOut}>Sign out</button>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          </>
         )}
       </div>
 
