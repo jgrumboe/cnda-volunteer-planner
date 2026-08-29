@@ -284,7 +284,6 @@ export default function App() {
                     </button>
                   ) : null}
                   <button role="menuitem" className="btn" onClick={() => setShowRules(true)}>Rules</button>
-                  <button role="menuitem" className="btn" onClick={() => setShowAccess(true)}>Access</button>
                   <button role="menuitem" className="btn" onClick={() => setShowImport(true)}>Import</button>
                   <button role="menuitem" className="btn" onClick={() => exportTasksCsv(state)}>Export tasks</button>
                   <button role="menuitem" className="btn" onClick={() => exportPeopleCsv(state)}>Export people</button>
