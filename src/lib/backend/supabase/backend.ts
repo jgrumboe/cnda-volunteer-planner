@@ -6,7 +6,7 @@
  */
 
 import type { SupabaseClient, RealtimeChannel } from '@supabase/supabase-js';
-import type { PlanState } from '../../../types';
+import type { PlanState, Person } from '../../../types';
 import type { PlanBackend, RowOp, SyncError, ConnectionState, AllClocks, RowClocks } from '../types';
 import { normalize } from '../../storage';
 import { getSupabaseClient, PLAN_SLUG } from './client';
@@ -14,6 +14,7 @@ import {
   rowOpToTable,
   rowOpToDbPayload,
   rowOpToDeleteMatch,
+  domainPersonNoteToDb,
   realtimeRowId,
   dbDayToDomain,
   dbPersonToDomain,
@@ -113,6 +114,28 @@ export function createSupabaseBackend(): PlanBackend {
         if (!payload) continue;
         // Upsert with the composite PK
         result = await supabase.from(table).upsert(payload, { onConflict: pkColumns(op.collection) });
+
+        // `notes` was split out of `people` into the organizer-only
+        // `person_notes` table (migration 0004), so a person upsert needs a
+        // second write. Only attempt it when the op actually carries a `notes`
+        // key: volunteers never see the field, and writing null on their behalf
+        // would erase an organizer's note (and fail RLS anyway).
+        if (!result.error && op.collection === 'people' && op.payload && 'notes' in op.payload) {
+          const person = op.payload as unknown as Person;
+          const note = person.notes ?? null;
+          const noteResult =
+            note === null || note === ''
+              ? await supabase
+                  .from('person_notes')
+                  .delete()
+                  .match({ plan_id: meta.planId, person_id: op.id })
+              : await supabase
+                  .from('person_notes')
+                  .upsert(domainPersonNoteToDb(person, meta.planId), {
+                    onConflict: 'plan_id,person_id',
+                  });
+          if (noteResult.error) result = noteResult;
+        }
       }
 
       if (result.error) {

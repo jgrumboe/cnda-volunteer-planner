@@ -104,11 +104,19 @@ function mergePeople(state: PlanState, event: InboundEvent): PlanState {
   const incoming = event.payload as unknown as Person;
   const idx = state.people.findIndex((p) => p.id === event.id);
   if (idx !== -1) {
-    if (shallowRowEqual(state.people[idx] as unknown as Record<string, unknown>, incoming as unknown as Record<string, unknown>)) {
+    // `notes` lives in the organizer-only `person_notes` table and never rides
+    // on a `people` row, so an inbound people upsert carries no notes at all.
+    // Taking `incoming` verbatim would blank an organizer's notes on every
+    // unrelated edit to that person. Carry the local value forward instead.
+    const merged: Person =
+      state.people[idx].notes === undefined
+        ? incoming
+        : { ...incoming, notes: state.people[idx].notes };
+    if (shallowRowEqual(state.people[idx] as unknown as Record<string, unknown>, merged as unknown as Record<string, unknown>)) {
       return state;
     }
     const people = [...state.people];
-    people[idx] = incoming;
+    people[idx] = merged;
     return { ...state, people };
   }
   return { ...state, people: [...state.people, incoming] };

@@ -21,6 +21,11 @@ export interface DbDay {
   updated_at: string;
 }
 
+/**
+ * NOTE: `notes` is deliberately absent. It lives in the organizer-only
+ * `person_notes` table (migration 0004) and never travels on a `people` row —
+ * not over REST, not over realtime. See dbPersonToDomain below.
+ */
 export interface DbPerson {
   plan_id: string;
   id: string;
@@ -30,6 +35,12 @@ export interface DbPerson {
   multi_shift: boolean;
   max_shifts: number | null;
   tags: string[];
+  updated_at: string;
+}
+
+export interface DbPersonNote {
+  plan_id: string;
+  person_id: string;
   notes: string | null;
   updated_at: string;
 }
@@ -65,6 +76,12 @@ export function dbDayToDomain(row: DbDay): EventDay {
   };
 }
 
+/**
+ * Returns a Person WITHOUT `notes` — the column does not exist on the row.
+ * Callers merging this into existing state must carry the local `notes`
+ * forward themselves (see mergePeople), otherwise an unrelated realtime
+ * update would blank an organizer's notes until the next reload.
+ */
 export function dbPersonToDomain(row: DbPerson): Person {
   return {
     id: row.id,
@@ -74,7 +91,6 @@ export function dbPersonToDomain(row: DbPerson): Person {
     multiShift: row.multi_shift,
     maxShifts: row.max_shifts,
     tags: (row.tags ?? []) as Person['tags'],
-    notes: row.notes ?? undefined,
   };
 }
 
@@ -112,6 +128,7 @@ export function domainDayToDb(day: EventDay, planId: string): Record<string, unk
   };
 }
 
+/** `notes` is intentionally not written here — see domainPersonNoteToDb. */
 export function domainPersonToDb(person: Person, planId: string): Record<string, unknown> {
   return {
     plan_id: planId,
@@ -122,6 +139,14 @@ export function domainPersonToDb(person: Person, planId: string): Record<string,
     multi_shift: person.multiShift,
     max_shifts: person.maxShifts,
     tags: person.tags,
+  };
+}
+
+/** Row for the organizer-only `person_notes` table. */
+export function domainPersonNoteToDb(person: Person, planId: string): Record<string, unknown> {
+  return {
+    plan_id: planId,
+    person_id: person.id,
     notes: person.notes ?? null,
   };
 }

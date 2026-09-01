@@ -17,6 +17,27 @@ export interface Sheet {
 const SIG_EOCD = 0x06054b50;
 const SIG_CD = 0x02014b50;
 
+// Hard bounds on the grid we are willing to materialize.
+//
+// `r` on <row> and <c> is attacker-controlled: it is just text in a file the
+// user was handed. Both feed array indices that the padding pass at the end of
+// readSheetRows walks DENSELY, so a single unchecked attribute turns a ~120
+// byte part into gigabytes of allocation (`<row r="50000000">` alone costs
+// ~9GB) and hangs the tab. A try/catch cannot help: nothing throws, it just
+// allocates until the tab dies. These are the real Excel sheet limits, so no
+// legitimate file is affected.
+const MAX_ROWS = 1_048_576;
+const MAX_COLS = 16_384;
+
+// The per-dimension caps still allow a huge PRODUCT (1M rows x 16k cols), and
+// the padding pass materializes every cell. This bounds the grid as a whole;
+// a real conference roster is a few thousand cells, so the headroom is large.
+const MAX_CELLS = 2_000_000;
+
+// Cap the decompressed size of a single ZIP part. `DecompressionStream` will
+// happily inflate a small deflate bomb into unbounded memory otherwise.
+const MAX_ENTRY_BYTES = 64 * 1024 * 1024;
+
 interface ZipEntry {
   name: string;
   method: number;
@@ -64,6 +85,11 @@ async function readEntry(buf: ArrayBuffer, entry: ZipEntry): Promise<string> {
   const nameLen = view.getUint16(entry.localOffset + 26, true);
   const extraLen = view.getUint16(entry.localOffset + 28, true);
   const start = entry.localOffset + 30 + nameLen + extraLen;
+  // The central directory is attacker-controlled and may point outside the
+  // file; Uint8Array would throw a bare RangeError, so fail with a real message.
+  if (start < 0 || start + entry.compressedSize > buf.byteLength) {
+    throw new Error(`Corrupt .xlsx: entry "${entry.name}" points outside the file.`);
+  }
   const raw = new Uint8Array(buf, start, entry.compressedSize);
 
   if (entry.method === 0) return new TextDecoder().decode(raw);
@@ -71,7 +97,33 @@ async function readEntry(buf: ArrayBuffer, entry: ZipEntry): Promise<string> {
     throw new Error(`Unsupported ZIP compression method ${entry.method} for ${entry.name}.`);
   }
   const stream = new Blob([raw]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
-  return new Response(stream).text();
+
+  // Read incrementally so a deflate bomb is stopped mid-stream rather than
+  // after it has already been fully materialized in memory.
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > MAX_ENTRY_BYTES) {
+      await reader.cancel();
+      throw new Error(
+        `Refusing to decompress "${entry.name}": it expands beyond ` +
+          `${MAX_ENTRY_BYTES / 1024 / 1024}MB. The file looks malformed or malicious.`,
+      );
+    }
+    chunks.push(value);
+  }
+
+  const merged = new Uint8Array(total);
+  let offset = 0;
+  for (const c of chunks) {
+    merged.set(c, offset);
+    offset += c.byteLength;
+  }
+  return new TextDecoder().decode(merged);
 }
 
 function parseXml(text: string): Document {
@@ -80,11 +132,14 @@ function parseXml(text: string): Document {
   return doc;
 }
 
-/** "BC" -> 55 (1-based). */
+/** "BC" -> 55 (1-based). Returns 0 for refs beyond the sheet limit. */
 function colToIndex(ref: string): number {
+  // A ref longer than 3 chars cannot be a real column ("XFD" is the last one),
+  // and left unchecked it multiplies to an astronomical index below.
+  if (ref.length > 3) return 0;
   let n = 0;
   for (const ch of ref) n = n * 26 + (ch.charCodeAt(0) - 64);
-  return n;
+  return n <= MAX_COLS ? n : 0;
 }
 
 function localName(el: Element): string {
@@ -156,14 +211,24 @@ async function readSheetRows(buf: ArrayBuffer, entry: ZipEntry, shared: string[]
 
   for (const rowEl of Array.from(doc.getElementsByTagName('*'))) {
     if (localName(rowEl) !== 'row') continue;
-    const rowNum = Number(rowEl.getAttribute('r') ?? grid.length + 1);
+    const rawRowNum = Number(rowEl.getAttribute('r') ?? grid.length + 1);
+    // Ignore junk/out-of-range `r` and fall back to positional order rather than
+    // trusting it as an index (see MAX_ROWS). NaN fails every comparison, so the
+    // explicit isInteger check is what actually rejects non-numeric refs.
+    const rowNum =
+      Number.isInteger(rawRowNum) && rawRowNum >= 1 && rawRowNum <= MAX_ROWS
+        ? rawRowNum
+        : grid.length + 1;
     const cells: string[] = [];
 
     for (const cEl of Array.from(rowEl.children)) {
       if (localName(cEl) !== 'c') continue;
       const ref = cEl.getAttribute('r') ?? '';
       const m = /^([A-Z]+)/.exec(ref);
-      const col = m ? colToIndex(m[1]) : cells.length + 1;
+      // colToIndex returns 0 for anything past the sheet limit; fall back to
+      // append-order so a bogus ref costs one cell instead of the whole grid.
+      const parsed = m ? colToIndex(m[1]) : 0;
+      const col = parsed > 0 ? parsed : cells.length + 1;
       const type = cEl.getAttribute('t');
 
       let value = '';
@@ -186,6 +251,15 @@ async function readSheetRows(buf: ArrayBuffer, entry: ZipEntry, shared: string[]
   }
 
   // Pad so consumers can index freely.
+  // `grid.length` is driven by the largest `r` seen, not by how many rows were
+  // actually present, so check the real cost before materializing anything.
+  if (grid.length * Math.max(widest, 1) > MAX_CELLS) {
+    throw new Error(
+      `Sheet is too large to import (${grid.length} rows x ${widest} columns). ` +
+        `The limit is ${MAX_CELLS.toLocaleString()} cells. If this is a normal ` +
+        `spreadsheet, it likely contains a corrupt cell reference.`,
+    );
+  }
   for (let r = 0; r < grid.length; r++) {
     const row = grid[r] ?? [];
     for (let c = 0; c < widest; c++) if (row[c] === undefined) row[c] = '';
