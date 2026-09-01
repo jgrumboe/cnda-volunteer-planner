@@ -39,7 +39,7 @@ export function BoardView({
   const [picker, setPicker] = useState<Task | null>(null);
   const [activeDayIndex, setActiveDayIndex] = useState(0);
   const isMobile = useIsMobile();
-  const touchStartX = useRef<number | null>(null);
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
 
   const peopleById = useMemo(() => new Map(state.people.map((p) => [p.id, p])), [state.people]);
 
@@ -60,14 +60,19 @@ export function BoardView({
   }, [activeDayIndex, byDay.length]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
+    const touch = e.touches[0];
+    touchStart.current = { x: touch.clientX, y: touch.clientY };
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
-    if (touchStartX.current === null) return;
-    const dx = e.changedTouches[0].clientX - touchStartX.current;
-    touchStartX.current = null;
-    if (Math.abs(dx) < 40) return;
+    if (touchStart.current === null) return;
+    const touch = e.changedTouches[0];
+    const dx = touch.clientX - touchStart.current.x;
+    const dy = touch.clientY - touchStart.current.y;
+    touchStart.current = null;
+
+    // Preserve vertical scrolling; navigate days only for a clearly horizontal swipe.
+    if (Math.abs(dx) < 40 || Math.abs(dx) <= Math.abs(dy)) return;
     if (dx < 0) {
       setActiveDayIndex((i) => Math.min(i + 1, byDay.length - 1));
     } else {
